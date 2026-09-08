@@ -2,14 +2,13 @@
 
 **Pixel LLMs** is a family of projects that bring pixel-level, dense grounded understanding to multimodal LLMs. It is anchored by **Sa2VA** — a unified model that marries SAM-2 with MLLMs for dense grounded understanding of images and videos — together with a growing set of research projects built on top of it.
 
-![Teaser](assets/images/teaser.jpg)
-
 ## 📊 Statistics
 
 <a href="https://github.com/bytedance/Sa2VA">
   <img src="https://repo-card.harboryuan.workers.dev/bytedance/Sa2VA.svg" alt="Sa2VA repo card" width="560">
 </a>
 
+![Teaser](assets/images/teaser.jpg)
 
 ## Projects
 
