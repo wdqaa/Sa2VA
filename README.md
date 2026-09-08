@@ -4,6 +4,13 @@
 
 ![Teaser](assets/images/teaser.jpg)
 
+## 📊 Statistics
+
+<a href="https://github.com/bytedance/Sa2VA">
+  <img src="https://repo-card.harboryuan.workers.dev/bytedance/Sa2VA.svg" alt="Sa2VA repo card" width="560">
+</a>
+
+
 ## Projects
 
 ### 🧠 [Sa2VA](./projects/sa2va/README.md) — Marrying SAM2 with MLLM (IEEE TPAMI 2026)
