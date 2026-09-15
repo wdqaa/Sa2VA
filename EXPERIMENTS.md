@@ -2,6 +2,30 @@
 
 本文件只记录真实运行过的实验。未运行的字段填写“未运行”，未知字段填写“待确认”，不得用预期值代替结果。每次实验复制以下模板，并按时间倒序追加。
 
+## 2026-09-15 Phase 2B-1 单样本零样本 smoke
+
+- 日期：2026-09-15
+- 实验 ID：`phase2b1-sa2va-internvl3-2b-single-smoke`
+- Git commit：基线 `e827280`；叠加尚未提交的 Phase 2B-0 文档和本轮 ChartGround-Edit 实现
+- 工作区状态（clean / dirty，附相关 diff 说明）：dirty；仅 ChartGround-Edit inference、CLI、测试、真实 gallery 资产及指定文档，无 Sa2VA 上游源码修改
+- 数据版本：`synthetic-v0`，schema `chartground-edit-v0`
+- 数据划分与样本数：test；仅 `cge_bar_category_01`，1 条；没有运行第二个样本或完整 test split
+- 模型与配置：`ByteDance/Sa2VA-InternVL3-2B`；BF16；单卡；`use_flash_attn=True`；`local_files_only=True`；无量化、offload、device map 或输入降采样覆盖
+- 权重来源与版本：用户预先下载的本地 checkpoint；revision `15837dcaecc304714a1f0f069e74f47e47521c7f`；本轮未下载
+- 可训练参数：未运行训练
+- 冻结参数：未运行训练
+- 硬件与软件环境：物理 GPU 2，进程内逻辑 `cuda:0`，RTX 3090；加载前 PyTorch 报告空闲 23,991.8125 MiB；torch 2.6.0+cu124；transformers 4.57.1；flash-attn 2.7.3
+- 随机种子：模型生成使用上游 `do_sample=False`；未另外设置随机种子
+- 运行命令：`CUDA_VISIBLE_DEVICES=2 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/run_sa2va_baseline.py --checkpoint /home/dqwang/Model/Sa2VA-InternVL3-2B --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl --sample-id cge_bar_category_01 --device cuda:0 --dtype bfloat16 --edit-action recolor --edit-color '#E63946' --output-dir /tmp/chartground_edit_phase2b1_smoke`
+- 实验目的：验证固定 Prompt → 官方 `predict_forward` → 原图尺寸二值 mask → 指标 → predicted-mask 编辑 → 可视化的单样本调用链
+- 预设验收条件：只跑固定柱状图样本一次；模型和 tokenizer 同一本地 checkpoint；第一个预测 mask 为主结果；不使用 GT 选 mask 或驱动编辑；失败也保存结构化结果
+- 结果：成功调用模型；文本输出 `Sure, [SEG].<|im_end|>`；`prediction_masks` 为 list，含 1 个 NumPy bool mask，原始 shape `(1, 320, 480)`、值域 false/true；后处理 shape `(320, 480)`，无需 resize，前景 11,738 像素；GT 前景 6,960 像素；empty prediction=false；IoU=0.0；Dice=0.0；recolor 编辑成功。预测非空但落在错误柱体，不能解释为分割成功。最终 ChartGround-Edit 回归 65/65 通过，`compileall` 通过。
+- 耗时与显存：模型及 tokenizer 加载 31,683.579 ms；`predict_forward` 1,223.360 ms；`torch.cuda.max_memory_allocated` 为 4,917.639 MiB。峰值从加载前 reset 后统计，覆盖模型加载和推理；未同步采集 nvidia-smi 峰值，两者不可比较。
+- 产物路径：完整临时输出 `/tmp/chartground_edit_phase2b1_smoke`；版本化真实对比图 `projects/chartground_edit/assets/sa2va_2b_smoke.png`
+- 问题：单样本零样本定位错误，IoU/Dice 为 0；这只验证调用链，不足以判断 2B 在 test split 上的整体质量。上游还打印 `torch_dtype` 弃用和 timm import FutureWarning，本轮未修改上游接口。
+- 结论：Phase 2B-1 单样本端到端调用链已真实跑通；完整 Phase 2 baseline、test split 汇总和任何训练仍未完成
+- 下一步：先审核该失败案例及 adapter 产物；若继续，应在独立阶段运行全部 4 条 test 样本并保留所有失败，而不是根据 GT 调 Prompt
+
 ## 2026-09-15 Phase 2B-0 环境与 checkpoint 校验
 
 - 日期：2026-09-15

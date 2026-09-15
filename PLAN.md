@@ -77,6 +77,10 @@
 
 用户已将首选固定为 `ByteDance/Sa2VA-InternVL3-2B` revision `15837dcaecc304714a1f0f069e74f47e47521c7f`，取代 Phase 2A 当时的 Sa2VA-1B 候选排序。已按 `setup_env.sh`、`projects/sa2va/pyproject.toml` 和 `uv.lock` 创建 `projects/sa2va/.venv`（物理目录 `/tmp/sa2va_env`），使用 InternVL3 对应的 `latest` 组，并完成关键依赖导入、7 张 RTX 3090 的轻量 CUDA 通信、checkpoint JSON/index/safetensors 文件头和本地 revision metadata 校验。ChartGround-Edit 回归为 40/40 通过，`compileall` 通过；没有加载模型、执行推理/训练或下载任何 checkpoint。环境和 checkpoint 细节见 `projects/chartground_edit/docs/phase2_environment.md`。当前 7 张 GPU 的显存占用均约 22.96 GiB，Phase 2B-1 必须等待可用 GPU 后再做 BF16 单样本实测；Phase 2 推理仍未标记完成。
 
+### Phase 2B-1 实际状态（2026-09-15）
+
+已在 `projects/chartground_edit/` 内实现模型无关的 `PredictionResult`、严格 mask 后处理、IoU/Dice/空预测/成功判定、懒加载的 `Sa2VAInternVL3Backend` 和单样本 CLI；没有修改 Sa2VA 上游源码。轻量回归为 65/65 通过。GPU 门槛复核后仅在物理 GPU 2（进程内逻辑 `cuda:0`）执行一次固定样本 `cge_bar_category_01`：模型文本为 `Sure, [SEG].<|im_end|>`，返回 1 个 `(1, 320, 480)` bool mask，非空且编辑成功，但与 GT 无交集，IoU/Dice 均为 0.0。模型加载 31,683.58 ms、`predict_forward` 1,223.36 ms，PyTorch 峰值 allocated memory 4,917.64 MiB。真实对比资产为 `projects/chartground_edit/assets/sa2va_2b_smoke.png`。这只证明单样本调用链可运行，不代表模型质量或完整 test split 已完成；Phase 2 baseline 仍未标记完成。
+
 ### 目标
 
 在不训练的前提下跑通单图指代分割基线，保存结构化输出和失败信息。

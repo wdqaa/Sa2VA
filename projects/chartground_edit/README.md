@@ -2,7 +2,7 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：Phase 1A 的数据与可视化闭环、Phase 1B 的 ground-truth mask 可控编辑后端均已实现并通过测试。Phase 2B-0 已按仓库 lock 建立 Sa2VA-InternVL3-2B 环境并校验本地 checkpoint；尚未加载模型或接入 Sa2VA，模型推理、训练和模型评测均未运行。
+当前状态：Phase 1A 数据闭环、Phase 1B ground-truth mask 编辑后端和 Phase 2B-1 单样本 Sa2VA 推理闭环均已实现。Sa2VA-InternVL3-2B 已真实运行 1 个固定 smoke 样本；完整 test split、训练和微调均未运行。
 
 ## MVP
 
@@ -24,6 +24,7 @@ projects/chartground_edit/
 └── chartground_edit/       # Python 包
     ├── datasets/           # schema、reader、合成生成器、同步变换
     ├── editing/            # GT/predicted mask 均可复用的确定性编辑后端
+    ├── inference/          # Sa2VA backend、结果类型、mask 后处理与指标
     └── visualization/      # 原图/mask/overlay/目标裁剪及 contact sheet
 ```
 
@@ -109,10 +110,35 @@ bash setup_env.sh sa2va latest
 source projects/sa2va/.venv/bin/activate
 ```
 
-checkpoint 路径不得硬编码；Phase 2B-1 的 ChartGround-Edit CLI 将使用必填
+checkpoint 路径不得硬编码；ChartGround-Edit CLI 使用必填
 `--checkpoint PATH` 参数。当前环境版本、完整安装记录、离线约定、checkpoint
 校验结果和已知依赖 metadata 冲突见
-[`docs/phase2_environment.md`](docs/phase2_environment.md)。本阶段尚未运行模型。
+[`docs/phase2_environment.md`](docs/phase2_environment.md)。
+
+## Phase 2B-1：单样本 Sa2VA baseline
+
+CLI 从 JSONL 读取原图、GT 和未经补充的原始 instruction，固定构造一个 Prompt，
+再将模型的第一个预测 mask 交给指标与现有编辑器。`--skip-model-run` 可在无 GPU
+时验证输入和 Prompt，且不会加载模型：
+
+```bash
+projects/sa2va/.venv/bin/python \
+  projects/chartground_edit/scripts/run_sa2va_baseline.py \
+  --checkpoint /path/to/Sa2VA-InternVL3-2B \
+  --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
+  --sample-id cge_bar_category_01 \
+  --device cuda:0 --dtype bfloat16 \
+  --edit-action recolor --edit-color "#E63946" \
+  --output-dir /tmp/chartground_edit_phase2b1_smoke \
+  --skip-model-run
+```
+
+2026-09-15 的唯一真实 smoke 使用 checkpoint revision
+`15837dcaecc304714a1f0f069e74f47e47521c7f`。模型生成
+`Sure, [SEG].<|im_end|>` 并返回一个非空 bool mask，但预测了错误柱体，实际
+IoU/Dice 均为 0.0。编辑链路成功不代表分割正确；尚未运行完整 test split。
+
+![Sa2VA-InternVL3-2B single-sample smoke result](assets/sa2va_2b_smoke.png)
 
 ## 开发路线
 
