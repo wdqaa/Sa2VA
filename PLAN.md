@@ -73,6 +73,10 @@
 
 已完成只读的 Sa2VA 推理路径、硬件、环境、本地资源和官方 checkpoint 元数据审计，并形成 `projects/chartground_edit/docs/phase2_baseline_plan.md`。首个零样本候选规划为固定 revision 的 `ByteDance/Sa2VA-1B`（InternVL2.5、BF16），备选为 `ByteDance/Sa2VA-InternVL3-2B`；实际峰值显存仍待单样本验证。当前 `chartground` 环境缺少 PyTorch/transformers，本地也没有完整 Sa2VA checkpoint，因此尚不具备运行条件。本阶段没有安装依赖、下载权重、运行推理/训练或修改 Sa2VA 核心代码；Phase 2 推理未标记完成。
 
+### Phase 2B-0 实际状态（2026-09-15）
+
+用户已将首选固定为 `ByteDance/Sa2VA-InternVL3-2B` revision `15837dcaecc304714a1f0f069e74f47e47521c7f`，取代 Phase 2A 当时的 Sa2VA-1B 候选排序。已按 `setup_env.sh`、`projects/sa2va/pyproject.toml` 和 `uv.lock` 创建 `projects/sa2va/.venv`（物理目录 `/tmp/sa2va_env`），使用 InternVL3 对应的 `latest` 组，并完成关键依赖导入、7 张 RTX 3090 的轻量 CUDA 通信、checkpoint JSON/index/safetensors 文件头和本地 revision metadata 校验。ChartGround-Edit 回归为 40/40 通过，`compileall` 通过；没有加载模型、执行推理/训练或下载任何 checkpoint。环境和 checkpoint 细节见 `projects/chartground_edit/docs/phase2_environment.md`。当前 7 张 GPU 的显存占用均约 22.96 GiB，Phase 2B-1 必须等待可用 GPU 后再做 BF16 单样本实测；Phase 2 推理仍未标记完成。
+
 ### 目标
 
 在不训练的前提下跑通单图指代分割基线，保存结构化输出和失败信息。

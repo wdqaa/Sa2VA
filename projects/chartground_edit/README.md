@@ -2,7 +2,7 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：Phase 1A 的数据与可视化闭环、Phase 1B 的 ground-truth mask 可控编辑后端均已实现并通过测试。尚未接入 Sa2VA；模型推理、训练和模型评测均未运行。
+当前状态：Phase 1A 的数据与可视化闭环、Phase 1B 的 ground-truth mask 可控编辑后端均已实现并通过测试。Phase 2B-0 已按仓库 lock 建立 Sa2VA-InternVL3-2B 环境并校验本地 checkpoint；尚未加载模型或接入 Sa2VA，模型推理、训练和模型评测均未运行。
 
 ## MVP
 
@@ -98,6 +98,21 @@ python projects/chartground_edit/scripts/generate_editing_gallery.py \
   --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
   --output projects/chartground_edit/assets/editing_v0_gallery.png
 ```
+
+## Phase 2 环境准备
+
+Sa2VA-InternVL3-2B 使用仓库 `latest` 依赖组。环境入口由官方脚本创建在
+`projects/sa2va/.venv`，物理目录位于 `/tmp/sa2va_env`：
+
+```bash
+bash setup_env.sh sa2va latest
+source projects/sa2va/.venv/bin/activate
+```
+
+checkpoint 路径不得硬编码；Phase 2B-1 的 ChartGround-Edit CLI 将使用必填
+`--checkpoint PATH` 参数。当前环境版本、完整安装记录、离线约定、checkpoint
+校验结果和已知依赖 metadata 冲突见
+[`docs/phase2_environment.md`](docs/phase2_environment.md)。本阶段尚未运行模型。
 
 ## 开发路线
 
