@@ -69,6 +69,10 @@
 
 ## Phase 2：Sa2VA 推理基线
 
+### Phase 2A 实际状态（2026-09-15）
+
+已完成只读的 Sa2VA 推理路径、硬件、环境、本地资源和官方 checkpoint 元数据审计，并形成 `projects/chartground_edit/docs/phase2_baseline_plan.md`。首个零样本候选规划为固定 revision 的 `ByteDance/Sa2VA-1B`（InternVL2.5、BF16），备选为 `ByteDance/Sa2VA-InternVL3-2B`；实际峰值显存仍待单样本验证。当前 `chartground` 环境缺少 PyTorch/transformers，本地也没有完整 Sa2VA checkpoint，因此尚不具备运行条件。本阶段没有安装依赖、下载权重、运行推理/训练或修改 Sa2VA 核心代码；Phase 2 推理未标记完成。
+
 ### 目标
 
 在不训练的前提下跑通单图指代分割基线，保存结构化输出和失败信息。
