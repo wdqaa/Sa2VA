@@ -2,7 +2,7 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：仅完成仓库理解、项目规划和工程骨架初始化。数据读取、模型适配、训练、编辑器、评测和 Demo 均尚未实现。
+当前状态：Phase 1A 的 v0 标注协议、JSONL 校验器、最小 Reader、32 条确定性合成数据、同步几何变换和可视化闭环已实现并通过测试。尚未接入 Sa2VA；模型推理、训练、编辑器和模型评测均未运行。
 
 ## MVP
 
@@ -11,24 +11,53 @@ ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可�
 - 编辑：`highlight`、`recolor`、`extract`、`remove`
 - 暂不支持：字符级 OCR 分割、数学公式理解、复杂三维图表和开放域编辑
 
-## 预期目录结构
+## 当前目录结构
 
 ```text
 projects/chartground_edit/
-├── README.md               # 子项目入口、用法与状态
-├── configs/                # 数据、推理、微调和评测配置
-├── data/                   # schema、轻量 manifest 与数据卡；不提交大型数据
-├── scripts/                # 数据检查、可视化、推理、评测和 Demo 启动脚本
-├── tests/                  # schema、几何一致性、编辑器和 smoke tests
+├── README.md
+├── docs/                   # v0 标注规范与 JSONL schema
+├── data/                   # 数据卡与本地生成的 synthetic_v0（生成物被 gitignore）
+├── scripts/                # Phase 1A 数据生成入口
+├── tests/                  # schema、Reader、确定性、几何与可视化测试
 └── chartground_edit/       # Python 包
-    ├── datasets/           # 后续：schema、reader、同步变换
-    ├── models/             # 后续：Sa2VA 薄适配层
-    ├── editing/            # 后续：四类确定性编辑操作
-    ├── evaluation/         # 后续：分割与编辑指标
-    └── visualization/      # 后续：overlay 与 before/mask/after
+    ├── datasets/           # schema、reader、合成生成器、同步变换
+    └── visualization/      # 原图/mask/overlay/目标裁剪及 contact sheet
 ```
 
-目录中的模块名表示规划，不代表功能已完成；本轮只创建顶层空目录。
+## Phase 1A 快速使用
+
+从仓库根目录运行；命令只生成本地小图，不下载数据或模型：
+
+```bash
+PYTHONPATH=projects/chartground_edit python \
+  projects/chartground_edit/scripts/generate_synthetic_v0.py \
+  --output-dir projects/chartground_edit/data/synthetic_v0 \
+  --seed 20260915 --clean
+```
+
+生成后可打开：
+
+- `projects/chartground_edit/data/synthetic_v0/annotations.jsonl`
+- `projects/chartground_edit/data/synthetic_v0/gallery.png`
+- `projects/chartground_edit/data/synthetic_v0/visualizations/*.png`
+
+运行测试：
+
+```bash
+python -m pytest projects/chartground_edit/tests -q
+```
+
+可单独验证已有 manifest：
+
+```bash
+PYTHONPATH=projects/chartground_edit python \
+  projects/chartground_edit/scripts/validate_jsonl_v0.py \
+  projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
+  --expected-count 32
+```
+
+协议详见 `docs/annotation_spec_v0.md` 与 `docs/jsonl_schema_v0.md`，数据限制详见 `docs/data_card_synthetic_v0.md`。
 
 ## 开发路线
 

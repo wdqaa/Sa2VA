@@ -32,6 +32,10 @@
 
 ## Phase 1：最小数据格式与可视化
 
+### Phase 1A 实际状态（2026-09-15）
+
+已完成本阶段的数据协议、32 条确定性合成数据、JSONL 校验与 Reader、同步 resize/crop/horizontal flip，以及原图/mask/overlay/目标裁剪和 contact sheet 闭环。默认 seed 为 `20260915`，16 个 `chart_type × referring_type` 组合各 2 条；相关测试为 9/9 通过。生成结果位于 `projects/chartground_edit/data/synthetic_v0/`（本地生成物受根 `.gitignore` 的 `data/` 规则影响，不作为大型数据提交）。Sa2VA 接入、模型推理和训练均未运行；后续 Phase 未标记完成。
+
 ### 目标
 
 定义可版本化的数据 schema，并用 32 个本地小样本验证图像、表达、mask 与元数据的一致性。
