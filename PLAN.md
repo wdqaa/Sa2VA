@@ -36,6 +36,10 @@
 
 已完成本阶段的数据协议、32 条确定性合成数据、JSONL 校验与 Reader、同步 resize/crop/horizontal flip，以及原图/mask/overlay/目标裁剪和 contact sheet 闭环。默认 seed 为 `20260915`，16 个 `chart_type × referring_type` 组合各 2 条；相关测试为 9/9 通过。生成结果位于 `projects/chartground_edit/data/synthetic_v0/`（本地生成物受根 `.gitignore` 的 `data/` 规则影响，不作为大型数据提交）。Sa2VA 接入、模型推理和训练均未运行；后续 Phase 未标记完成。
 
+### Phase 1B 实际状态（2026-09-15）
+
+已完成独立于模型的 GT mask 编辑后端，支持 `highlight`、`recolor`、`extract`、`remove`，以及参数校验、直接运行的 CLI、四类图表展示 gallery 和像素级测试。Phase 1B 新增测试 31/31 通过，Phase 1A+1B 全量回归 40/40 通过。展示资产为 `projects/chartground_edit/assets/editing_v0_gallery.png`。本阶段仅验证 ground-truth mask；Sa2VA 接入、预测 mask、模型推理和训练均未运行。原计划 Phase 5 中与模型预测、编辑评测和完整 API/Demo 集成有关的工作仍未标记完成。
+
 ### 目标
 
 定义可版本化的数据 schema，并用 32 个本地小样本验证图像、表达、mask 与元数据的一致性。

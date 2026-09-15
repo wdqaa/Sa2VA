@@ -2,7 +2,7 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：Phase 1A 的 v0 标注协议、JSONL 校验器、最小 Reader、32 条确定性合成数据、同步几何变换和可视化闭环已实现并通过测试。尚未接入 Sa2VA；模型推理、训练、编辑器和模型评测均未运行。
+当前状态：Phase 1A 的数据与可视化闭环、Phase 1B 的 ground-truth mask 可控编辑后端均已实现并通过测试。尚未接入 Sa2VA；模型推理、训练和模型评测均未运行。
 
 ## MVP
 
@@ -16,12 +16,14 @@ ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可�
 ```text
 projects/chartground_edit/
 ├── README.md
-├── docs/                   # v0 标注规范与 JSONL schema
-├── data/                   # 数据卡与本地生成的 synthetic_v0（生成物被 gitignore）
-├── scripts/                # Phase 1A 数据生成入口
-├── tests/                  # schema、Reader、确定性、几何与可视化测试
+├── assets/                 # README 使用的版本化展示资产
+├── docs/                   # 标注、JSONL、数据卡与编辑语义规范
+├── data/                   # 本地生成的 synthetic_v0（生成物被 gitignore）
+├── scripts/                # 数据、校验、编辑 CLI 与 gallery 入口
+├── tests/                  # 数据、几何、编辑器与 CLI 测试
 └── chartground_edit/       # Python 包
     ├── datasets/           # schema、reader、合成生成器、同步变换
+    ├── editing/            # GT/predicted mask 均可复用的确定性编辑后端
     └── visualization/      # 原图/mask/overlay/目标裁剪及 contact sheet
 ```
 
@@ -58,6 +60,44 @@ PYTHONPATH=projects/chartground_edit python \
 ```
 
 协议详见 `docs/annotation_spec_v0.md` 与 `docs/jsonl_schema_v0.md`，数据限制详见 `docs/data_card_synthetic_v0.md`。
+
+## Phase 1B：使用 mask 编辑
+
+编辑接口只接收 RGB Pillow 图像、二值 mask、动作名和参数，不依赖 Sa2VA 或 annotation 数据结构。完整契约见 `docs/editing_spec_v0.md`。
+
+```python
+from chartground_edit.editing import edit
+
+edited = edit(image, mask, "recolor", {"color": "#E63946"})
+```
+
+CLI 可从仓库根目录直接运行：
+
+```bash
+python projects/chartground_edit/scripts/edit_with_mask.py \
+  --image projects/chartground_edit/data/synthetic_v0/images/cge_bar_category_01.png \
+  --mask projects/chartground_edit/data/synthetic_v0/masks/cge_bar_category_01.png \
+  --action recolor \
+  --output /tmp/chartground_edit_recolor.png \
+  --color "#E63946"
+```
+
+CLI 同时提供 `--highlight-strength` 和 `--remove-fill-mode {color,neighbor}`；运行 `--help` 可查看完整参数。四种动作的 v0 语义为：
+
+- `highlight`：mask 内保持原样，mask 外按强度变暗并降低饱和度；这是唯一预期修改 mask 外的动作。
+- `recolor`：仅修改 mask 内色相/饱和度，并保留原像素 HSL lightness。
+- `extract`：返回 RGBA，mask 外 alpha 为 0，mask 内保留原 RGB。
+- `remove`：仅在 mask 内使用固定色或确定性邻域中位数填充，不进行内容恢复或生成式修复。
+
+![Phase 1B ground-truth mask editing gallery](assets/editing_v0_gallery.png)
+
+gallery 可复现生成：
+
+```bash
+python projects/chartground_edit/scripts/generate_editing_gallery.py \
+  --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
+  --output projects/chartground_edit/assets/editing_v0_gallery.png
+```
 
 ## 开发路线
 
