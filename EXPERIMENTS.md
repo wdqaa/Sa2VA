@@ -2,6 +2,29 @@
 
 本文件只记录真实运行过的实验。未运行的字段填写“未运行”，未知字段填写“待确认”，不得用预期值代替结果。每次实验复制以下模板，并按时间倒序追加。
 
+## 2026-09-16 Phase 3A balanced synthetic_v1 生成与审计
+
+- 日期：2026-09-16
+- 实验 ID：`phase3a-synthetic-v1-generation-audit`
+- Git commit：基线 `f3783cf`；叠加本轮尚未提交的 v1 schema/Reader/生成器/审计器、测试、gallery 和文档
+- 工作区状态（clean / dirty，附相关 diff 说明）：dirty；仅 ChartGround-Edit Phase 3A 与根 PLAN/EXPERIMENTS，无 Sa2VA 上游源码修改
+- 数据版本：`synthetic-v1.0.0`，schema `chartground-edit-v1`，mask semantics `chartground-edit-mask-v0`
+- 数据划分与样本数：train 192 / val 64 / test 64，共 320；16 个 chart/referring 组合各为 12/4/4；每种 action 共 80
+- 模型与配置：未运行
+- 权重来源与版本：未运行
+- 可训练参数：未运行
+- 冻结参数：未运行
+- 硬件与软件环境：Python 3.11.16；NumPy 2.3.4；Pillow 11.3.0；pytest 9.1.1；CPU 本地生成，不需要 GPU
+- 随机种子：`20260916`；逐样本 seed 由固定输入字符串的 SHA-256 确定，manifest 内无重复
+- 运行命令：`projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/generate_synthetic_v1.py --output-dir projects/chartground_edit/data/synthetic_v1 --seed 20260916 --clean --gallery-output projects/chartground_edit/assets/synthetic_v1_gallery.png`；独立 `validate_synthetic_v1.py --expected-count 320`；独立 `audit_synthetic_v1.py --expected-count 320 --near-duplicate-threshold 0.01`；临时目录同 seed 再生成并逐文件哈希比较
+- 实验目的：构建 split、组合、action、难度明确且可复现的 320 条合成数据，严格检查 mask 语义、重复与跨 split 泄漏
+- 预设验收条件：320/192/64/64；每组合 12/4/4；action 3/1/1；v0 兼容；所有 mask 二值非空并符合图表语义；身份/文件/内容无精确重复；同 seed 字节一致；独立审计硬失败为 0
+- 结果：生成与独立 schema 校验 320/320 通过；独立审计硬失败 0。easy/medium/hard 为 106/107/107；空 mask、全一 mask、语义错误、ID/path/seed/scene/content 重复、跨 split family 泄漏、image/mask 精确重复均为 0。前景像素 min/median/mean/max 为 592/2419/5667.5625/18744。近重复指纹阈值 0.01 保守报告 97 对跨 split 人工复核候选，不自动删除。Phase 3A 专项测试首次 18/18 通过、16 条 warning；最终全量 ChartGround-Edit 回归 109/109 通过、188 条既有 Pillow `mode` 弃用 warning；`compileall` 通过。同 seed 双目录 manifest SHA-256 均为 `ebad55fd98356204e572ffe6607a16a34c9dde8a916a9977a7f08bc4aed2ba82`，640 个 image/mask 文件集合及逐文件哈希完全一致，0 个 mismatch。
+- 产物路径：本地忽略数据 `projects/chartground_edit/data/synthetic_v1/`；版本化 gallery `projects/chartground_edit/assets/synthetic_v1_gallery.png`；schema、data card 和审计见 `projects/chartground_edit/docs/`
+- 问题：共享 axes/layout 导致轻量指纹产生较多候选；合成字体、布局和语言模板仍不代表真实出版图表；这些限制不属于模型指标
+- 结论：Phase 3A 数据硬约束通过，具备进入独立 Phase 3B balanced-val Prompt benchmark 的数据条件；没有运行任何模型、val/test 推理或训练
+- 下一步：等待审核；若进入 Phase 3B，只在 64 条 balanced val 上执行预注册 Prompt benchmark，继续冻结 test
+
 ## 2026-09-16 Phase 2C val-only Prompt 诊断
 
 - 日期：2026-09-16

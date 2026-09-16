@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""Run the independent synthetic_v1 distribution, semantics, and leakage audit."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+if str(PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_ROOT))
+
+from chartground_edit.datasets.audit_v1 import (
+    DEFAULT_NEAR_DUPLICATE_THRESHOLD,
+    audit_synthetic_v1,
+    write_audit_json,
+)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--manifest", required=True, type=Path)
+    parser.add_argument("--expected-count", type=int, default=320)
+    parser.add_argument(
+        "--near-duplicate-threshold",
+        type=float,
+        default=DEFAULT_NEAR_DUPLICATE_THRESHOLD,
+    )
+    parser.add_argument("--output-json", type=Path)
+    args = parser.parse_args(argv)
+    try:
+        report = audit_synthetic_v1(
+            args.manifest,
+            expected_count=args.expected_count,
+            near_duplicate_threshold=args.near_duplicate_threshold,
+        )
+        if args.output_json is not None:
+            write_audit_json(report, args.output_json)
+    except (OSError, ValueError) as exc:
+        print(f"audit_error: {exc}", file=sys.stderr)
+        return 2
+    print(f"passed={str(report['passed']).lower()}")
+    print(f"sample_count={report['sample_count']}")
+    print(f"hard_failure_count={report['hard_failure_count']}")
+    print(
+        "near_duplicate_candidate_count="
+        f"{report['near_duplicate_check']['candidate_count']}"
+    )
+    if not report["passed"]:
+        for failure in report["hard_failures"]:
+            print(f"failure: {failure}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -115,6 +115,17 @@
 
 ## Phase 3：科学图表指代分割数据集
 
+### Phase 3A 实际状态（2026-09-16）
+
+已实现并严格审计 `synthetic_v1`：320 条、train/val/test=192/64/64，16 个
+`chart_type × referring_type` 组合各自为 12/4/4，四种 action 在组合内部严格平衡。
+v1 schema/Reader 直接保存完整指令和指代表达，保持 v0 API 向后兼容；easy/medium/hard
+全局为 106/107/107。seed、scene/content ID、style family 与 instruction template family
+按 split 隔离，独立审计的硬失败、精确 image/mask 重复、空/全一/语义错误 mask 均为
+0。低分辨率阈值 0.01 报告 97 对近重复人工复核候选，不自动删除。批量 PNG/manifest
+受 `.gitignore` 保护，只提交 16 组合 gallery。本阶段未加载模型、未运行 synthetic_v1
+val/test、未训练；Phase 3B Prompt benchmark、训练和最终 test 评测均未标记完成。
+
 ### 目标
 
 建立规模可控、分布明确、可复现且许可清晰的训练/验证/测试集。

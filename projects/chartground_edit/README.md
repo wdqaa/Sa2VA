@@ -2,7 +2,7 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：Phase 1A 数据闭环、Phase 1B ground-truth mask 编辑后端和 Phase 2B-1 单样本 Sa2VA 推理闭环均已实现。Sa2VA-InternVL3-2B 已真实运行 1 个固定 smoke 样本；完整 test split、训练和微调均未运行。
+当前状态：Phase 1、Phase 2 的固定 synthetic_v0 基线与 val-only Prompt 诊断，以及 Phase 3A balanced synthetic_v1 数据闭环均已完成。synthetic_v1 已生成和严格审计，但尚未在其 val/test 上运行模型；训练和微调均未开始。
 
 ## MVP
 
@@ -206,6 +206,28 @@ success 和 100% `[SEG]` output rate，含义只是全部样本成功产生协�
 synthetic_v1 val 的候选。test 零样本 macro IoU 仍只有 0.035667，且本轮没有重跑或
 用于调 Prompt。完整配对结果、限制和 synthetic_v1 规范见
 [`docs/phase2_prompt_diagnostic.md`](docs/phase2_prompt_diagnostic.md)。
+
+## Phase 3A：balanced synthetic_v1
+
+`synthetic_v1` 使用独立 v1 schema 和 Reader，直接保存 `full_instruction` 与
+`referring_expression`。数据共 320 条，16 个 chart/referring 组合各 20 条，并在每个
+组合内部固定为 train/val/test = 12/4/4；四种 edit action 在每个组合和 split 内严格
+平衡。生成与校验不导入 Torch、Transformers 或 Sa2VA：
+
+```bash
+projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/generate_synthetic_v1.py --output-dir projects/chartground_edit/data/synthetic_v1 --seed 20260916 --clean --gallery-output projects/chartground_edit/assets/synthetic_v1_gallery.png
+
+projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/audit_synthetic_v1.py --manifest projects/chartground_edit/data/synthetic_v1/annotations.jsonl --expected-count 320 --near-duplicate-threshold 0.01 --output-json projects/chartground_edit/data/synthetic_v1/audit.json
+```
+
+独立审计结果为 320/320 schema/file 合法、0 个硬约束失败、0 个空/全一 mask、0 个
+精确 image/mask 重复、0 个 ID/seed/scene/content 重复。保守的低分辨率跨 split 指纹
+报告 97 对人工复核候选，不自动删除；精确内容哈希和底层 content ID 均不同。完整协议、
+来源和审计边界见 [`docs/jsonl_schema_v1.md`](docs/jsonl_schema_v1.md)、
+[`docs/data_card_synthetic_v1.md`](docs/data_card_synthetic_v1.md) 与
+[`docs/synthetic_v1_audit.md`](docs/synthetic_v1_audit.md)。批量数据继续被 Git 忽略。
+
+![Balanced synthetic_v1 gallery](assets/synthetic_v1_gallery.png)
 
 ## 开发路线
 
