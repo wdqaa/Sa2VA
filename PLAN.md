@@ -138,6 +138,19 @@ frozen-test 的唯一全局 Prompt。P2−P1 的 paired bootstrap 95% CI 为
 本阶段未运行 synthetic_v1 train/test，未训练或微调；Phase 3C frozen test baseline
 尚未开始、未标记完成。
 
+### Phase 3C 实际状态（2026-09-16）
+
+已在独立冻结协议下，仅使用 Phase 3B 选定的全局 P2 `target_only_zh`，对
+`synthetic_v1` 64 条 test 各执行一次 Sa2VA-InternVL3-2B BF16 推理。模型加载一次，
+backend 调用 64/64，未比较 P0/P1、未重跑 val/train、未选择性重试，protocol 前后
+SHA-256 均为 `4d97adbf7fb3c9e958a58028f7ab3986cda71071fa4a48c9a0c2d66a9bd88817`。
+execution、mask contract 和 `[SEG]` 均为 64/64；空预测 27/64，nonempty-disjoint
+7/64。16-group Macro IoU/Dice 为 0.198033/0.242366，Micro IoU/Dice 为
+0.225301/0.367748。37 个非空预测全部由 predicted mask 成功执行真实 action/parameters，
+27 个空预测明确跳过。64 个保存 mask 的二值性、尺寸、IoU/Dice 和编辑输入来源独立
+复核通过。该结果只建立 frozen synthetic test baseline，不触发 Prompt 修改；训练与
+微调仍未开始。
+
 ### 目标
 
 建立规模可控、分布明确、可复现且许可清晰的训练/验证/测试集。

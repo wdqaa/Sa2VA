@@ -2,6 +2,35 @@
 
 本文件只记录真实运行过的实验。未运行的字段填写“未运行”，未知字段填写“待确认”，不得用预期值代替结果。每次实验复制以下模板，并按时间倒序追加。
 
+## 2026-09-16 Phase 3C frozen synthetic_v1 test baseline
+
+- 日期：2026-09-16
+- 实验 ID：`phase3c-sa2va-internvl3-2b-frozen-test-p2`
+- Git commit：基线 `6e7db536c306a9224e70342c8a7f713d8dc526e9`；叠加本轮未提交的冻结协议、runner/聚合/测试、真实标量结果、gallery 和文档
+- 工作区状态（clean / dirty，附相关 diff 说明）：开始门禁时 clean 且 Phase 3B 已提交；正式运行时 dirty，仅含本阶段已通过测试的 ChartGround-Edit 实现与冻结协议，无 Sa2VA 上游源码修改
+- 数据版本：`synthetic-v1.0.0`，schema `chartground-edit-v1`；manifest SHA-256 `ebad55fd98356204e572ffe6607a16a34c9dde8a916a9977a7f08bc4aed2ba82`；test sample-ID list SHA-256 `3061387f0012b13c2fd998d81819df0e7648e8e47ae9ad86ff06490ecfe2e5c4`
+- 数据划分与样本数：仅 test 64 条；16 个 chart/referring 组合各 4 条且四种 action 各 1 条；每条只运行 P2 一次；train/val 未推理
+- 模型与配置：`ByteDance/Sa2VA-InternVL3-2B`；P2 `target_only_zh`；BF16；单卡；`torch.inference_mode()`；`use_flash_attn=True`；`local_files_only=True`；无量化、offload、device map 或重试
+- 权重来源与版本：用户预先下载的本地 checkpoint `/home/dqwang/Model/Sa2VA-InternVL3-2B`；revision `15837dcaecc304714a1f0f069e74f47e47521c7f`；本轮未下载
+- 可训练参数：未运行训练
+- 冻结参数：未运行训练
+- 硬件与软件环境：物理 GPU 1 映射到逻辑 `cuda:0`，RTX 3090；正式运行前 nvidia-smi 空闲 24,252 MiB、0% utilization；模型加载前 PyTorch 空闲 23,991.8125 MiB
+- 随机种子：模型生成沿用上游确定性配置；16-group bootstrap seed `20260916`，10,000 次
+- 运行命令：`CUDA_VISIBLE_DEVICES=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/run_frozen_test_v1.py --checkpoint /home/dqwang/Model/Sa2VA-InternVL3-2B --manifest projects/chartground_edit/data/synthetic_v1/annotations.jsonl --split test --prompt-variant target_only_zh --device cuda:0 --dtype bfloat16 --expected-samples 64 --output-dir /tmp/chartground_edit_phase3c_frozen_test`
+- 实验目的：在 Prompt 选择完成后，以冻结 P2 对 balanced synthetic_v1 test 做唯一一次正式 zero-shot baseline，并验证 predicted-mask 编辑闭环
+- 预设验收条件：运行前协议冻结；64 条/64 调用；模型加载一次；只用图像与 `referring_expression` 生成的 registry P2；首个预测 mask；失败/空 mask 以 0 纳入；固定 group bootstrap；禁止 Prompt 搜索、选择性重跑和 GT mask 编辑
+- 结果：64/64 backend 调用和记录完成，execution success、mask contract valid、`[SEG]` 均为 64/64；nonempty 37/64、empty 27/64、overlap 30/64、nonempty-disjoint 7/64。16-group Macro IoU/Dice 0.198033/0.242366，sample Macro 相同，Micro IoU/Dice 0.225301/0.367748，median IoU/Dice 均为 0。最弱组按确定性排序为 `bar/appearance`，mean IoU=0；同为 0 的还有 `line/appearance` 和 `scatter/appearance`
+- Bootstrap：16 个 chart/referring group、10,000 次；Macro IoU 95% CI [0.101680, 0.316589]，Macro Dice 95% CI [0.139124, 0.360458]；仅描述 test 估计区间，不用于修改 Prompt
+- Validation/test：P2 test 相对 val 的 Macro IoU/Dice 为 +0.015834/+0.026145，empty/nonempty-disjoint rate 为 -0.015625/-0.046875；但 `bar/category` IoU -0.227059、`line/trend` -0.082575，`bar/trend` +0.236659，组间变化不一致，不据此返回 val 或修改 Prompt
+- 编辑闭环：37 个非空预测全部以保存的 predicted mask 和样本真实 action/parameters 调用现有编辑器且成功；27 个空预测标记 `edit_skipped_empty`；0 次 GT mask 替代。编辑成功只代表链路执行成功
+- 耗时与显存：模型加载 7,931.789 ms；mean/median predict latency 609.330/580.492 ms；PyTorch peak allocated 5,005.364 MiB；正式进程约 55 秒
+- 协议完整性：Prompt registry SHA-256 `dc822a33b84b1cdfb72f84bd5288f0ebb37626980496107c5e30d4c4c26217c0`；P2 template SHA-256 `37a785d086a80fef21fd69014670b3892acad5c379722cb79658fb837a923806`；protocol 前后 SHA-256 均为 `4d97adbf7fb3c9e958a58028f7ab3986cda71071fa4a48c9a0c2d66a9bd88817`
+- 验证命令与结果：正式 runner 内置及独立二次复核均为 64 条记录、64 个唯一 test ID、64 个二值原尺寸 mask、64 次 IoU/Dice 重算、37 个 predicted-mask 编辑输入，0 error；Phase 3C 专项测试最终 13/13 通过；ChartGround-Edit 全量最终 141/141 通过（188 条既有 Pillow warning）；`compileall` 和 `git diff --check` 通过；进程退出后物理 GPU 1 为 2 MiB used、24,252 MiB free、0% utilization，显存已释放
+- 产物路径：完整临时输出 `/tmp/chartground_edit_phase3c_frozen_test`；仓库标量 `projects/chartground_edit/results/phase3c_frozen_test_metrics.jsonl`、summary `phase3c_frozen_test_summary.json`、真实 gallery `projects/chartground_edit/assets/phase3c_frozen_test_gallery.png`、协议/报告 `projects/chartground_edit/docs/phase3c_frozen_test_*`
+- 问题：appearance 指代 16 条中 14 条为空，line/scatter appearance 均 4/4 空；难度与 distractor count 在 v1 中一一对应，不能分离二者影响；大目标 bar 组会抬高 micro 指标
+- 结论：Phase 3C frozen test baseline 和 predicted-mask 编辑闭环完成；test 结果没有改变 P2，也没有重跑 val、访问 train 或训练/微调
+- 下一步：具备进入 Phase 4 的工程条件，但必须先预注册并仅执行 1 样本 smoke 与 32 样本过拟合门槛；未经用户确认不运行完整训练
+
 ## 2026-09-16 Phase 3B balanced synthetic_v1 val Prompt benchmark
 
 - 日期：2026-09-16

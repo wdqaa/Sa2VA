@@ -2,7 +2,7 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：Phase 1、Phase 2 的固定 synthetic_v0 基线与 val-only Prompt 诊断、Phase 3A balanced synthetic_v1 数据闭环，以及 Phase 3B balanced-val Prompt benchmark 均已完成。P2 `target_only_zh` 已按预注册规则 selected on validation；synthetic_v1 test 仍冻结，训练和微调均未开始。
+当前状态：Phase 1、Phase 2 的固定 synthetic_v0 基线与 val-only Prompt 诊断、Phase 3A balanced synthetic_v1 数据闭环、Phase 3B balanced-val Prompt benchmark，以及 Phase 3C frozen synthetic_v1 test baseline 均已完成。P2 `target_only_zh` 已按预注册规则 selected on validation，并原样用于唯一一次 64 条 frozen test 运行；训练和微调均未开始。
 
 ## MVP
 
@@ -250,7 +250,27 @@ execution success 和 mask contract valid 也均为 64/64；nonempty prediction 
 [`docs/phase3b_benchmark_protocol.md`](docs/phase3b_benchmark_protocol.md) 与
 [`docs/phase3b_balanced_val_results.md`](docs/phase3b_balanced_val_results.md)。仓库只保存
 标量 JSONL/summary 和 16 组合 gallery；192 个 mask/overlay 保留在 `/tmp`，不提交 Git。
-synthetic_v1 test 没有运行，后续 Phase 3C 必须使用同一个 P2 并单独审核。
+Phase 3B 当时没有运行 synthetic_v1 test；后续 Phase 3C 已按该约束使用同一个 P2。
+
+## Phase 3C：frozen synthetic_v1 test baseline
+
+Phase 3C 在模型推理前冻结独立 protocol，仅允许 `split=test` 和 P2
+`target_only_zh`。模型只加载一次，64 条 test 各调用一次，64/64 execution success、
+mask contract valid 和 `[SEG]`；37 条非空、27 条空预测，30 条与 GT 重叠、7 条
+nonempty-disjoint。16-group Macro IoU/Dice 为 0.198033/0.242366，Micro IoU/Dice 为
+0.225301/0.367748。基于 16 个 group 的 10,000 次固定 seed bootstrap 给出 Macro IoU
+95% CI [0.101680, 0.316589]，Macro Dice 95% CI [0.139124, 0.360458]。
+
+全部 37 个非空预测使用该样本真实 action/parameters 和 predicted mask 完成编辑；27 个
+空预测明确跳过，没有用 GT mask 替代。完整临时输出保存在
+`/tmp/chartground_edit_phase3c_frozen_test`，仓库保存 64 条标量、summary 和固定
+16 组 gallery。test 指标不用于修改 Prompt，也没有回到 validation 重新选择。
+
+![Phase 3C frozen synthetic_v1 test baseline](assets/phase3c_frozen_test_gallery.png)
+
+冻结协议和结果分别见
+[`docs/phase3c_frozen_test_protocol.md`](docs/phase3c_frozen_test_protocol.md) 与
+[`docs/phase3c_frozen_test_results.md`](docs/phase3c_frozen_test_results.md)。
 
 ## 开发路线
 
