@@ -2,7 +2,7 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：Phase 1、Phase 2 的固定 synthetic_v0 基线与 val-only Prompt 诊断，以及 Phase 3A balanced synthetic_v1 数据闭环均已完成。synthetic_v1 已生成和严格审计，但尚未在其 val/test 上运行模型；训练和微调均未开始。
+当前状态：Phase 1、Phase 2 的固定 synthetic_v0 基线与 val-only Prompt 诊断、Phase 3A balanced synthetic_v1 数据闭环，以及 Phase 3B balanced-val Prompt benchmark 均已完成。P2 `target_only_zh` 已按预注册规则 selected on validation；synthetic_v1 test 仍冻结，训练和微调均未开始。
 
 ## MVP
 
@@ -228,6 +228,29 @@ projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/audit_syntheti
 [`docs/synthetic_v1_audit.md`](docs/synthetic_v1_audit.md)。批量数据继续被 Git 忽略。
 
 ![Balanced synthetic_v1 gallery](assets/synthetic_v1_gallery.png)
+
+## Phase 3B：balanced-val Prompt benchmark
+
+固定 Sa2VA-InternVL3-2B、BF16 和 Phase 2C 的 P0/P1/P2，在 synthetic_v1 的 64 条 val
+样本上各运行一次，共 192 次。模型只加载一次，protocol 前后 SHA-256 一致，192 个预测
+mask 均独立重算指标通过。按预注册的 16-group Macro IoU 规则选择 P2
+`target_only_zh`：P0/P1/P2 为 0.164503/0.179093/0.182199。
+
+P2 相对 P1 的差值只有 +0.003106，10,000 次 paired group bootstrap 95% CI 为
+[-0.006147, 0.015220]，包含 0。因此 P2 只是 **selected on validation** 的全局 operational
+choice，不能称为显著更优或 test 结论。三种 Prompt 的 `[SEG]` output rate 都是 100%，
+execution success 和 mask contract valid 也均为 64/64；nonempty prediction 分别为
+35/64、36/64、36/64，empty prediction 为 29/64、28/64、28/64。空 mask 是合法模型
+输出，不是执行异常。历史 `inference_success` 字段保留但已 deprecated，不能再展示为
+执行成功率；协议成功同样不代表分割准确率。
+
+![Phase 3B balanced val Prompt benchmark](assets/phase3b_balanced_val_prompt_benchmark.png)
+
+冻结协议和完整结果分别见
+[`docs/phase3b_benchmark_protocol.md`](docs/phase3b_benchmark_protocol.md) 与
+[`docs/phase3b_balanced_val_results.md`](docs/phase3b_balanced_val_results.md)。仓库只保存
+标量 JSONL/summary 和 16 组合 gallery；192 个 mask/overlay 保留在 `/tmp`，不提交 Git。
+synthetic_v1 test 没有运行，后续 Phase 3C 必须使用同一个 P2 并单独审核。
 
 ## 开发路线
 

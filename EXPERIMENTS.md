@@ -2,6 +2,32 @@
 
 本文件只记录真实运行过的实验。未运行的字段填写“未运行”，未知字段填写“待确认”，不得用预期值代替结果。每次实验复制以下模板，并按时间倒序追加。
 
+## 2026-09-16 Phase 3B balanced synthetic_v1 val Prompt benchmark
+
+- 日期：2026-09-16
+- 实验 ID：`phase3b-sa2va-internvl3-2b-balanced-val-prompt-benchmark`
+- Git commit：基线 `b022e4d10c8f6fc922fd3d18790ef999b85f36a2`；叠加本轮未提交的冻结协议、benchmark 模块/CLI/测试、真实标量结果、gallery 和文档
+- 工作区状态（clean / dirty，附相关 diff 说明）：开始时 clean 且 Phase 3A 已提交；正式运行时 dirty，仅含本阶段已通过单元测试的实现和冻结协议，无 Sa2VA 上游源码修改
+- 数据版本：`synthetic-v1.0.0`，schema `chartground-edit-v1`；manifest SHA-256 `ebad55fd98356204e572ffe6607a16a34c9dde8a916a9977a7f08bc4aed2ba82`
+- 数据划分与样本数：仅 val 64 条；16 个 chart/referring 组合各 4 条且四种 action 各 1 条；每条 P0/P1/P2 各一次，共 192 次；train/test 未推理
+- 模型与配置：`ByteDance/Sa2VA-InternVL3-2B`；BF16；单卡；`use_flash_attn=True`；`local_files_only=True`；无量化、offload、device map 或重试
+- 权重来源与版本：用户预先下载的本地 checkpoint；revision `15837dcaecc304714a1f0f069e74f47e47521c7f`；本轮未下载
+- 可训练参数：未运行训练
+- 冻结参数：未运行训练
+- 硬件与软件环境：物理 GPU 0 映射到逻辑 `cuda:0`，RTX 3090；加载前 PyTorch 空闲 23,991.8125 MiB；正式进程前 nvidia-smi 空闲约 24,252 MiB、0% utilization
+- 随机种子：模型生成沿用上游确定性配置；paired bootstrap seed `20260916`，10,000 次
+- 运行命令：`CUDA_VISIBLE_DEVICES=0 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/run_prompt_benchmark_v1.py --checkpoint /home/dqwang/Model/Sa2VA-InternVL3-2B --manifest projects/chartground_edit/data/synthetic_v1/annotations.jsonl --split val --device cuda:0 --dtype bfloat16 --expected-samples 64 --output-dir /tmp/chartground_edit_phase3b_balanced_val`
+- 实验目的：在不访问 test 的条件下，以预注册 primary metric 从 P0/P1/P2 选择一个全局 Prompt，供后续 frozen-test baseline 使用
+- 预设验收条件：protocol 在首次推理前冻结；64×3 单次顺序调用；模型加载一次；失败/空 mask 以 0 纳入；16-group Macro IoU 选择；固定 bootstrap；不按类型路由或根据结果改 Prompt
+- 结果：192/192 backend 调用完成，模型加载 1 次，无全局错误。P0/P1/P2 的 execution success 均为 64/64，mask contract valid 均为 64/64，`[SEG]` rate 均为 100%；nonempty prediction 为 35/64、36/64、36/64，empty prediction 为 29/64、28/64、28/64。历史 `inference_success` 字段保留原值并标记 deprecated，不能解释为执行成功。16-group Macro IoU 为 0.164503/0.179093/0.182199，Macro Dice 为 0.192781/0.210226/0.216221，Micro IoU 为 0.150734/0.202185/0.192302。按预注册规则选择 P2 `target_only_zh`。nonempty-disjoint rate 为 12.5%/15.625%/15.625%。P2−P0 group Macro IoU +0.017696，95% CI [-0.000062, 0.039690]；P2−P1 +0.003106，95% CI [-0.006147, 0.015220]；均包含 0，只能称 selected on validation。落盘 192 个 mask 的尺寸/二值性和标量指标独立重算全部通过；protocol 前后 SHA-256 均为 `5de44dcf8e21845aaf3d8c5355faedd62b80899cc54b698e7fe2731aa839ef1d`。
+- 耗时与显存：模型加载 7,963.318 ms；P0/P1/P2 mean predict latency 578.854/575.031/568.848 ms；PyTorch peak allocated 5,006.784 MiB；正式进程约 130 秒（含加载、192 次调用、保存与汇总）
+- metric-semantics 收尾：未加载模型、未运行推理，仅由现有 192 条标量和保存 mask 离线重聚合；命令为 `projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/reaggregate_phase3b_metrics.py --metrics projects/chartground_edit/results/phase3b_balanced_val_metrics.jsonl --summary projects/chartground_edit/results/phase3b_balanced_val_summary.json --protocol projects/chartground_edit/docs/phase3b_benchmark_protocol.md`。protocol 未修改，IoU/Dice/bootstrap/P2 选择均未改变
+- 验证命令与结果：`projects/sa2va/.venv/bin/python -m pytest projects/chartground_edit/tests/test_prompt_benchmark_v1.py -q` 为 19/19 通过；`projects/sa2va/.venv/bin/python -m pytest projects/chartground_edit/tests -q` 为 128/128 通过，188 条既有 Pillow `mode` 弃用 warning；`compileall`、独立落盘 mask/指标复核和 `git diff --check` 均通过
+- 产物路径：完整临时输出 `/tmp/chartground_edit_phase3b_balanced_val`；仓库标量 `projects/chartground_edit/results/phase3b_balanced_val_metrics.jsonl` 和 `phase3b_balanced_val_summary.json`；真实 gallery `projects/chartground_edit/assets/phase3b_balanced_val_prompt_benchmark.png`；协议/报告见 `projects/chartground_edit/docs/phase3b_*`
+- 问题：虽然 192/192 都生成 `[SEG]` 且返回一个 `(1,320,480)` bool mask，85 个 mask 为空；appearance、line category、bar trend 等组接近或等于 0。difficulty 与 distractor count 在 v1 中一一对应，无法分离影响。P2 的 bootstrap CI 包含 0，没有明确统计优势。
+- 结论：P2 是 synthetic_v1 val 上按冻结规则得到的 operational selection，不是 test 或真实图表结论；execution、mask contract、`[SEG]`、nonempty 和 overlap 是不同语义，均不等同于 segmentation accuracy
+- 下一步：等待审核；若进入独立 Phase 3C，只能使用冻结的 P2 对 synthetic_v1 test 运行一次，不再根据 test 改 Prompt；本轮不训练或微调
+
 ## 2026-09-16 Phase 3A balanced synthetic_v1 生成与审计
 
 - 日期：2026-09-16

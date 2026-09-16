@@ -126,6 +126,18 @@ v1 schema/Reader 直接保存完整指令和指代表达，保持 v0 API 向后�
 受 `.gitignore` 保护，只提交 16 组合 gallery。本阶段未加载模型、未运行 synthetic_v1
 val/test、未训练；Phase 3B Prompt benchmark、训练和最终 test 评测均未标记完成。
 
+### Phase 3B 实际状态（2026-09-16）
+
+已按冻结协议在 synthetic_v1 的 64 条 balanced val 上完成 P0/P1/P2 共 192 次真实
+Sa2VA-InternVL3-2B BF16 推理；单进程、单 GPU、模型只加载一次，全部 attempt 完成且
+protocol hash 前后相同。P0/P1/P2 的 16-group Macro IoU 为
+0.164503/0.179093/0.182199，按预注册 primary metric 选择 P2 `target_only_zh` 作为后续
+frozen-test 的唯一全局 Prompt。P2−P1 的 paired bootstrap 95% CI 为
+[-0.006147, 0.015220]，包含 0，因此只称为 selected on validation，不声称显著优势。
+所有文本均含 `[SEG]`，但 empty rate 为 43.75%–45.31%，协议成功不等于分割准确。
+本阶段未运行 synthetic_v1 train/test，未训练或微调；Phase 3C frozen test baseline
+尚未开始、未标记完成。
+
 ### 目标
 
 建立规模可控、分布明确、可复现且许可清晰的训练/验证/测试集。
