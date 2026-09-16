@@ -140,6 +140,36 @@ IoU/Dice 均为 0.0。编辑链路成功不代表分割正确；尚未运行完�
 
 ![Sa2VA-InternVL3-2B single-sample smoke result](assets/sa2va_2b_smoke.png)
 
+## Phase 2B-2：固定 test split 零样本基线
+
+批量入口在一个进程中创建一个 backend，并按 manifest 顺序处理 split；模型只加载
+一次，单样本失败不会触发重试。以下命令固定选择 4 条 test 样本，仍使用 Phase
+2B-1 的唯一 Prompt 和第一个预测 mask：
+
+```bash
+CUDA_VISIBLE_DEVICES=2 \
+HF_HUB_OFFLINE=1 \
+TRANSFORMERS_OFFLINE=1 \
+projects/sa2va/.venv/bin/python \
+  projects/chartground_edit/scripts/run_sa2va_split.py \
+  --checkpoint /path/to/Sa2VA-InternVL3-2B \
+  --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
+  --split test --device cuda:0 --dtype bfloat16 \
+  --expected-count 4 --continue-on-sample-error \
+  --output-dir /tmp/chartground_edit_phase2b2_test
+```
+
+2026-09-15 的真实运行中，4/4 inference success、0/4 空预测、2/4 nonempty
+disjoint；macro mean IoU/Dice 为 0.035667/0.064015，micro IoU/Dice 为
+0.006158/0.012241。模型只加载一次。所有编辑图均由 predicted mask 驱动；错误预测
+也完整保留在下图中。
+
+![Sa2VA-InternVL3-2B synthetic_v0 test zero-shot results](assets/sa2va_2b_zeroshot_test.png)
+
+这只是 4 条合成样本的诊断性 baseline，不是最终统计结果。test split 未用于 Prompt
+选择；后续 Prompt 诊断只能在 val split 上进行。逐样本输出、文本、耗时、显存和
+结果解释见 [`docs/phase2_zeroshot_results.md`](docs/phase2_zeroshot_results.md)。
+
 ## 开发路线
 
 1. Phase 0：完成 Sa2VA 源码地图、环境边界和工程骨架。

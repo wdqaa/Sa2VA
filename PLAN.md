@@ -81,6 +81,10 @@
 
 已在 `projects/chartground_edit/` 内实现模型无关的 `PredictionResult`、严格 mask 后处理、IoU/Dice/空预测/成功判定、懒加载的 `Sa2VAInternVL3Backend` 和单样本 CLI；没有修改 Sa2VA 上游源码。轻量回归为 65/65 通过。GPU 门槛复核后仅在物理 GPU 2（进程内逻辑 `cuda:0`）执行一次固定样本 `cge_bar_category_01`：模型文本为 `Sure, [SEG].<|im_end|>`，返回 1 个 `(1, 320, 480)` bool mask，非空且编辑成功，但与 GT 无交集，IoU/Dice 均为 0.0。模型加载 31,683.58 ms、`predict_forward` 1,223.36 ms，PyTorch 峰值 allocated memory 4,917.64 MiB。真实对比资产为 `projects/chartground_edit/assets/sa2va_2b_smoke.png`。这只证明单样本调用链可运行，不代表模型质量或完整 test split 已完成；Phase 2 baseline 仍未标记完成。
 
+### Phase 2B-2 实际状态（2026-09-15）
+
+已使用同一固定 checkpoint、BF16、Prompt 和 mask 后处理，对 `synthetic_v0` 的 4 条 test 样本进行一次顺序零样本运行；一个 backend 实例只加载模型一次，没有重试、Prompt 调优或 GT mask 编辑。4/4 推理调用成功并返回一个非空 `(1, 320, 480)` bool mask，编辑均成功；2/4 与 GT 有交集，2/4 为 nonempty disjoint。macro mean IoU/Dice 为 0.035667/0.064015，micro IoU/Dice 为 0.006158/0.012241；加载 9,586.27 ms，平均 `predict_forward` 782.74 ms，PyTorch peak allocated 5,004.33 MiB。结果与限制见 `projects/chartground_edit/docs/phase2_zeroshot_results.md`，真实总览为 `projects/chartground_edit/assets/sa2va_2b_zeroshot_test.png`。这是 4 条合成样本的诊断性基线，不代表最终统计结果；完整 Phase 2 和训练仍未标记完成。
+
 ### 目标
 
 在不训练的前提下跑通单图指代分割基线，保存结构化输出和失败信息。

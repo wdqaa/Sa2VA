@@ -2,6 +2,30 @@
 
 本文件只记录真实运行过的实验。未运行的字段填写“未运行”，未知字段填写“待确认”，不得用预期值代替结果。每次实验复制以下模板，并按时间倒序追加。
 
+## 2026-09-15 Phase 2B-2 synthetic_v0 test 零样本基线
+
+- 日期：2026-09-15
+- 实验 ID：`phase2b2-sa2va-internvl3-2b-zeroshot-test`
+- Git commit：基线 `272637b`；叠加本轮尚未提交的 ChartGround-Edit 批量脚本、测试、真实 gallery 和指定文档
+- 工作区状态（clean / dirty，附相关 diff 说明）：dirty；仅 `projects/chartground_edit/` 推理批处理、测试、资产/文档及根 PLAN/EXPERIMENTS，无 Sa2VA 上游源码修改
+- 数据版本：`synthetic-v0`，schema `chartground-edit-v0`
+- 数据划分与样本数：test，4 条：`cge_line_category_01`、`cge_bar_category_01`、`cge_scatter_category_01`、`cge_confidence_band_category_01`；未运行 train/val
+- 模型与配置：`ByteDance/Sa2VA-InternVL3-2B`；BF16；单卡；`use_flash_attn=True`；`local_files_only=True`；固定 Phase 2B-1 Prompt；无量化、offload、device map 或输入分辨率覆盖
+- 权重来源与版本：用户预先下载的本地 checkpoint；revision `15837dcaecc304714a1f0f069e74f47e47521c7f`；本轮未下载
+- 可训练参数：未运行训练
+- 冻结参数：未运行训练
+- 硬件与软件环境：物理 GPU 2，进程内逻辑 `cuda:0`，RTX 3090；模型加载前 PyTorch 空闲 23,991.8125 MiB；Python 3.11.16；torch 2.6.0+cu124；transformers 4.57.1；flash-attn 2.7.3
+- 随机种子：模型生成使用上游 `do_sample=False`；未另外设置随机种子
+- 运行命令：`CUDA_VISIBLE_DEVICES=2 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/run_sa2va_split.py --checkpoint /home/dqwang/Model/Sa2VA-InternVL3-2B --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl --split test --device cuda:0 --dtype bfloat16 --expected-count 4 --continue-on-sample-error --output-dir /tmp/chartground_edit_phase2b2_test`
+- 实验目的：在固定协议下验证模型只加载一次的 test split 批量推理、失败记录、全样本聚合指标、predicted-mask 编辑和可视化链路
+- 预设验收条件：严格选择 4 条 test；一个 backend、顺序单次推理；第一个 mask 为主结果；失败也计入汇总；不使用 GT 选 mask、驱动编辑或调 Prompt
+- 结果：4/4 inference success；每条均为 1 个 `(1,320,480)` bool raw mask，非空且编辑成功。line IoU/Dice 0.015209/0.029963；bar 0/0、nonempty disjoint；scatter 0.127458/0.226098；confidence_band 0/0、nonempty disjoint。macro mean IoU/Dice 0.035667/0.064015，median 0.007605/0.014981；micro IoU/Dice 0.006158/0.012241；empty rate 0%，nonempty-disjoint rate 50%，overlap rate 50%。文本前三条为 `Sure, [SEG].<|im_end|>`，confidence band 为 `Sure, it is [SEG].<|im_end|>`。
+- 耗时与显存：模型只加载一次（计数 1），9,586.266 ms；4 条 `predict_forward` 合计 3,130.961 ms、平均 782.740 ms；PyTorch peak allocated 5,004.330 MiB，覆盖加载和全部推理
+- 产物路径：完整临时输出 `/tmp/chartground_edit_phase2b2_test`；版本化真实总览 `projects/chartground_edit/assets/sa2va_2b_zeroshot_test.png`；详细记录 `projects/chartground_edit/docs/phase2_zeroshot_results.md`
+- 问题：首次受限沙箱启动时 GPU 设备不可见，模型加载前即失败且没有调用 `predict_forward`；随后在 GPU 可访问上下文以相同固定配置完成唯一正式运行。零样本结果显示模型常返回合法非空 mask，但会选择错误序列或元素。
+- 结论：批量工程调用链真实跑通，但只有 4 条合成样本且整体重叠很低，不能视为最终统计结果；低性能不等于工程链路失败
+- 下一步：若获审核通过，应只在 val split 做预先声明的 Prompt 诊断，再扩充真实图表与 referring-type 数据；最终 Prompt 不得根据本轮 test 结果修改，不直接开始微调
+
 ## 2026-09-15 Phase 2B-1 单样本零样本 smoke
 
 - 日期：2026-09-15

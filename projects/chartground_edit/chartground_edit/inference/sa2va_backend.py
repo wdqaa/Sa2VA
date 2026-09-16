@@ -70,6 +70,7 @@ class Sa2VAInternVL3Backend:
         self._model: Any = None
         self._tokenizer: Any = None
         self._loaded = False
+        self.model_load_attempts = 0
         self.model_load_time_ms: float | None = None
         self.pre_load_free_gpu_memory_mb: float | None = None
 
@@ -81,6 +82,7 @@ class Sa2VAInternVL3Backend:
         """Load once from local files and move the complete model to one GPU."""
         if self._loaded:
             return
+        self.model_load_attempts += 1
         started = time.perf_counter()
         try:
             self._prepare_cuda_for_load()

@@ -215,6 +215,7 @@ def test_backend_lazy_loads_once_and_records_upstream_contract(tmp_path: Path) -
     second = backend.predict_mask(image, "target")
     assert backend.is_loaded
     assert backend.load_calls == 1
+    assert backend.model_load_attempts == 1
     assert backend.fake_model.calls == 2
     assert first.success and second.success
     assert first.num_masks == 2
