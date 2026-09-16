@@ -2,6 +2,30 @@
 
 本文件只记录真实运行过的实验。未运行的字段填写“未运行”，未知字段填写“待确认”，不得用预期值代替结果。每次实验复制以下模板，并按时间倒序追加。
 
+## 2026-09-16 Phase 2C val-only Prompt 诊断
+
+- 日期：2026-09-16
+- 实验 ID：`phase2c-sa2va-internvl3-2b-val-prompt-diagnostic`
+- Git commit：基线 `8463d0a`；叠加本轮尚未提交的 instruction/Prompt/诊断模块、CLI、测试、真实 gallery 和指定文档
+- 工作区状态（clean / dirty，附相关 diff 说明）：dirty；仅 ChartGround-Edit inference 边界、Phase 2C 脚本/测试/资产/文档及 PLAN/README/本记录，无 Sa2VA 上游源码修改
+- 数据版本：`synthetic-v0`，schema `chartground-edit-v0`；manifest 未修改
+- 数据划分与样本数：仅 val 4 条，均为 category/highlight；每条运行 `full_instruction`、`target_only_en`、`target_only_zh`，共 12 次；未运行 train/test
+- 模型与配置：`ByteDance/Sa2VA-InternVL3-2B`；BF16；单卡；`use_flash_attn=True`；`local_files_only=True`；无量化、offload、device map 或输入分辨率覆盖
+- 权重来源与版本：用户预先下载的本地 checkpoint；revision `15837dcaecc304714a1f0f069e74f47e47521c7f`；本轮未下载
+- 可训练参数：未运行训练
+- 冻结参数：未运行训练
+- 硬件与软件环境：物理 GPU 1，进程内逻辑 `cuda:0`，RTX 3090；运行前 `nvidia-smi` 约 24,252 MiB 空闲、0% utilization；Python 3.11.16；torch 2.6.0+cu124；transformers 4.57.1；flash-attn 2.7.3
+- 随机种子：模型生成使用上游 `do_sample=False`；未另外设置随机种子
+- 运行命令：`CUDA_VISIBLE_DEVICES=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/run_prompt_diagnostic.py --checkpoint /home/dqwang/Model/Sa2VA-InternVL3-2B --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl --split val --prompt-variants full_instruction,target_only_en,target_only_zh --device cuda:0 --dtype bfloat16 --expected-count 4 --output-dir /tmp/chartground_edit_phase2c_prompt_diagnostic`
+- 实验目的：仅在 val 上比较预注册 P0/P1/P2，诊断完整编辑动作文本是否干扰目标定位，并保持 test 冻结
+- 预设验收条件：指代表达只从原 instruction 连续子串提取；同一模型加载一次；12 个组合各推理一次；首个 mask 为主结果；不翻译、不用隐藏属性、不用 GT 选择 Prompt/mask、不重试
+- 结果：12/12 inference success，12/12 输出 `[SEG]`，无空 mask；所有文本均为 `Sure, [SEG].<|im_end|>`。P0/P1/P2 macro IoU 为 0.392236/0.340420/0.351172，macro Dice 为 0.437576/0.391375/0.428990，micro IoU 为 0.666654/0.558417/0.609943，micro Dice 为 0.799991/0.716647/0.757720；三个 variant 均为 25% nonempty-disjoint、75% overlap。P1 没有提高任何样本 IoU；P2 改善 scatter/confidence-band，但明显恶化 bar。
+- 耗时与显存：模型加载一次（计数 1），9,460.079 ms；P0/P1/P2 平均推理时间为 757.661/569.087/546.161 ms；PyTorch peak allocated 5,004.661 MiB。P0 第一条含首次生成 warm-up，不将均值差异解释为稳定速度优势。
+- 产物路径：完整临时输出 `/tmp/chartground_edit_phase2c_prompt_diagnostic`；版本化 gallery `projects/chartground_edit/assets/phase2c_prompt_diagnostic.png`；结果文档 `projects/chartground_edit/docs/phase2_prompt_diagnostic.md`；split 审计 `projects/chartground_edit/docs/synthetic_v0_split_audit.md`
+- 问题：val 只有 4 条、全部 category/highlight；train 缺 category，val/test 缺 appearance/legend/trend，edit action 与 split 完全混杂；无法检验其他动作参数或进行显著性分析
+- 结论：删除编辑动作没有显示一致改善；中文 wrapper 不影响 `[SEG]` 协议成功，但会改变 mask 几何。按当前有限 val 聚合，P0 仅作为 balanced synthetic_v1 val 的候选，不是最终 Prompt；100% inference success 不等于 100% segmentation accuracy
+- 下一步：先实现并审计 balanced synthetic_v1（建议 320 条、192/64/64），随后只在其 val 上重新比较预注册候选；不重新运行 test，不开始微调
+
 ## 2026-09-15 Phase 2B-2 synthetic_v0 test 零样本基线
 
 - 日期：2026-09-15

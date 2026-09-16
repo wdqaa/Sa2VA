@@ -85,6 +85,10 @@
 
 已使用同一固定 checkpoint、BF16、Prompt 和 mask 后处理，对 `synthetic_v0` 的 4 条 test 样本进行一次顺序零样本运行；一个 backend 实例只加载模型一次，没有重试、Prompt 调优或 GT mask 编辑。4/4 推理调用成功并返回一个非空 `(1, 320, 480)` bool mask，编辑均成功；2/4 与 GT 有交集，2/4 为 nonempty disjoint。macro mean IoU/Dice 为 0.035667/0.064015，micro IoU/Dice 为 0.006158/0.012241；加载 9,586.27 ms，平均 `predict_forward` 782.74 ms，PyTorch peak allocated 5,004.33 MiB。结果与限制见 `projects/chartground_edit/docs/phase2_zeroshot_results.md`，真实总览为 `projects/chartground_edit/assets/sa2va_2b_zeroshot_test.png`。这是 4 条合成样本的诊断性基线，不代表最终统计结果；完整 Phase 2 和训练仍未标记完成。
 
+### Phase 2C 实际状态（2026-09-16）
+
+已完成 synthetic_v0 split 审计，确认生成顺序使 train/val/test 分别固定覆盖“非 category / category-highlight / category-recolor”，不具备平衡泛化评测条件。新增不读取 `target_attributes` 的 synthetic-v0 指令拆分、三个预注册 Prompt、val-only CLI 防护、配对汇总和 gallery；test/train 未运行。物理 GPU 1 上同一 Sa2VA-InternVL3-2B BF16 实例只加载一次，完成 4 条 val × 3 Prompt 的 12 次单次推理。三个 variant 均为 100% inference/SEG success、0% empty、25% nonempty-disjoint；P0/P1/P2 macro IoU 分别为 0.392236/0.340420/0.351172，macro Dice 为 0.437576/0.391375/0.428990。删除编辑动作没有表现出一致改善，中文 wrapper 不影响 `[SEG]` 输出但显著改变部分 mask 几何。P0 只能作为 future balanced synthetic_v1 val 的候选，不能视为最终 Prompt。详见 `projects/chartground_edit/docs/synthetic_v0_split_audit.md` 和 `projects/chartground_edit/docs/phase2_prompt_diagnostic.md`。本轮未生成 synthetic_v1、未训练，也未将 Phase 2 标记为全部完成。
+
 ### 目标
 
 在不训练的前提下跑通单图指代分割基线，保存结构化输出和失败信息。

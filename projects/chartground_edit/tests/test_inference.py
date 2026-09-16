@@ -225,6 +225,22 @@ def test_backend_lazy_loads_once_and_records_upstream_contract(tmp_path: Path) -
     assert first.mask.tolist() == [[False, True], [False, False]]
 
 
+def test_backend_predict_prompt_forwards_exact_registered_text(tmp_path: Path) -> None:
+    backend = _FakeBackend(tmp_path)
+    image = Image.new("RGB", (2, 2), "white")
+    exact_prompt = "<image>请分割目标。\n请使用 [SEG] 标记返回分割掩码。"
+    result = backend.predict_prompt(
+        image,
+        exact_prompt,
+        instruction="原始编辑指令",
+    )
+    assert result.success
+    assert result.prompt == exact_prompt
+    assert result.instruction == "原始编辑指令"
+    assert backend.load_calls == 1
+    assert backend.fake_model.calls == 1
+
+
 def test_backend_structures_missing_seg_and_masks(tmp_path: Path) -> None:
     backend = _FakeBackend(tmp_path)
     backend.fake_model.predict_forward = lambda **kwargs: {

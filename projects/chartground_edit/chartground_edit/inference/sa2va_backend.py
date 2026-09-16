@@ -10,15 +10,13 @@ from typing import Any
 from PIL import Image
 
 from .mask_processing import MaskProcessingError, process_prediction_masks
+from .prompt_variants import FULL_INSTRUCTION, PROMPT_TEMPLATES, build_prompt_variant
 from .types import PredictionResult
 
 
 MODEL_NAME = "ByteDance/Sa2VA-InternVL3-2B"
 MIN_FREE_GPU_MEMORY_MB = 14_000.0
-PROMPT_TEMPLATE = (
-    "<image>Please segment the chart element targeted by this instruction: {instruction}\n"
-    "Please respond with a segmentation mask."
-)
+PROMPT_TEMPLATE = PROMPT_TEMPLATES[FULL_INSTRUCTION]
 
 
 class Sa2VAError(RuntimeError):
@@ -31,9 +29,11 @@ class Sa2VALoadError(Sa2VAError):
 
 def build_prompt(instruction: str) -> str:
     """Apply the one frozen Phase 2B-1 prompt without enriching instruction."""
-    if type(instruction) is not str or not instruction.strip():
-        raise ValueError("instruction must be a non-empty string")
-    return PROMPT_TEMPLATE.format(instruction=instruction)
+    return build_prompt_variant(
+        FULL_INSTRUCTION,
+        instruction=instruction,
+        referring_expression=instruction,
+    )
 
 
 class Sa2VAInternVL3Backend:
@@ -104,13 +104,33 @@ class Sa2VAInternVL3Backend:
         parameters: dict[str, Any] | None = None,
     ) -> PredictionResult:
         """Call upstream ``predict_forward`` and normalize its first mask."""
+        prompt = build_prompt(instruction)
+        return self.predict_prompt(
+            image,
+            prompt,
+            instruction=instruction,
+            parameters=parameters,
+        )
+
+    def predict_prompt(
+        self,
+        image: Image.Image,
+        prompt: str,
+        *,
+        instruction: str,
+        parameters: dict[str, Any] | None = None,
+    ) -> PredictionResult:
+        """Run an exact pre-registered prompt without consulting ground truth."""
         if not isinstance(image, Image.Image):
             raise TypeError("image must be a Pillow Image")
         if image.mode != "RGB":
             raise ValueError(f"image mode must be RGB, got {image.mode!r}")
+        if type(prompt) is not str or not prompt.strip():
+            raise ValueError("prompt must be a non-empty string")
+        if type(instruction) is not str or not instruction.strip():
+            raise ValueError("instruction must be a non-empty string")
         if parameters not in (None, {}):
             raise ValueError("Sa2VAInternVL3Backend does not accept inference parameters yet")
-        prompt = build_prompt(instruction)
 
         try:
             self.load()

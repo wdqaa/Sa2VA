@@ -170,6 +170,43 @@ disjoint；macro mean IoU/Dice 为 0.035667/0.064015，micro IoU/Dice 为
 选择；后续 Prompt 诊断只能在 val split 上进行。逐样本输出、文本、耗时、显存和
 结果解释见 [`docs/phase2_zeroshot_results.md`](docs/phase2_zeroshot_results.md)。
 
+## Phase 2C：val-only Prompt 诊断
+
+split 审计确认 synthetic_v0 存在生成顺序偏置：train 只有 appearance/legend/trend，
+val 和 test 都只有 category；val 全是 highlight，test 全是 recolor。具体交叉表与适用
+边界见 [`docs/synthetic_v0_split_audit.md`](docs/synthetic_v0_split_audit.md)。原 manifest
+没有修改。
+
+Phase 2C 将 synthetic-v0 instruction 确定性拆成 `referring_expression`、
+`edit_action` 和显式 `edit_parameters`，并只在 val 上比较三个预注册 Prompt：
+
+```bash
+CUDA_VISIBLE_DEVICES=1 \
+HF_HUB_OFFLINE=1 \
+TRANSFORMERS_OFFLINE=1 \
+projects/sa2va/.venv/bin/python \
+  projects/chartground_edit/scripts/run_prompt_diagnostic.py \
+  --checkpoint /path/to/Sa2VA-InternVL3-2B \
+  --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
+  --split val \
+  --prompt-variants full_instruction,target_only_en,target_only_zh \
+  --device cuda:0 --dtype bfloat16 --expected-count 4 \
+  --output-dir /tmp/chartground_edit_phase2c_prompt_diagnostic
+```
+
+脚本明确拒绝 `--split test`。真实 4×3 运行中三个 Prompt 都达到 100% inference
+success 和 100% `[SEG]` output rate，含义只是全部样本成功产生协议合法输出，**不代表
+100% segmentation accuracy**。P0/P1/P2 macro IoU 分别为
+0.392236/0.340420/0.351172；删除编辑动作没有显示一致改善。中文 wrapper 保持
+`[SEG]` 输出，但改变了部分 mask 几何。
+
+![Phase 2C val-only Prompt diagnostic](assets/phase2c_prompt_diagnostic.png)
+
+本诊断只有 4 条 category/highlight 合成 val 样本；P0 最多只能作为 balanced
+synthetic_v1 val 的候选。test 零样本 macro IoU 仍只有 0.035667，且本轮没有重跑或
+用于调 Prompt。完整配对结果、限制和 synthetic_v1 规范见
+[`docs/phase2_prompt_diagnostic.md`](docs/phase2_prompt_diagnostic.md)。
+
 ## 开发路线
 
 1. Phase 0：完成 Sa2VA 源码地图、环境边界和工程骨架。
