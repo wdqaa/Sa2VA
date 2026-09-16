@@ -2,7 +2,7 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：Phase 1、Phase 2 的固定 synthetic_v0 基线与 val-only Prompt 诊断、Phase 3A balanced synthetic_v1 数据闭环、Phase 3B balanced-val Prompt benchmark，以及 Phase 3C frozen synthetic_v1 test baseline 均已完成。P2 `target_only_zh` 已按预注册规则 selected on validation，并原样用于唯一一次 64 条 frozen test 运行；训练和微调均未开始。
+当前状态：Phase 1–3C 已完成；Phase 4A 的训练源码审计、train-only smoke1/overfit32 子集冻结和纯数据契约已完成。P2 `target_only_zh` 保持冻结，模型训练、forward/backward 和 checkpoint 转换均未执行。审计发现 P2 用户文本与 official assistant target 各含一个 `[SEG]`，而现有训练 forward 不按 labels 过滤用户 token；该问题是 Phase 4B 前的硬门禁，当前不能宣称训练链路可用。
 
 ## MVP
 
@@ -17,6 +17,7 @@ ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可�
 projects/chartground_edit/
 ├── README.md
 ├── assets/                 # README 使用的版本化展示资产
+├── configs/                # Phase 4 train-only ID 清单与设计态配置
 ├── docs/                   # 标注、JSONL、数据卡与编辑语义规范
 ├── data/                   # 本地生成的 synthetic_v0（生成物被 gitignore）
 ├── scripts/                # 数据、校验、编辑 CLI 与 gallery 入口
@@ -25,6 +26,7 @@ projects/chartground_edit/
     ├── datasets/           # schema、reader、合成生成器、同步变换
     ├── editing/            # GT/predicted mask 均可复用的确定性编辑后端
     ├── inference/          # Sa2VA backend、结果类型、mask 后处理与指标
+    ├── training/           # 不加载模型的 train-only 契约与子集选择
     └── visualization/      # 原图/mask/overlay/目标裁剪及 contact sheet
 ```
 
@@ -271,6 +273,30 @@ nonempty-disjoint。16-group Macro IoU/Dice 为 0.198033/0.242366，Micro IoU/Di
 冻结协议和结果分别见
 [`docs/phase3c_frozen_test_protocol.md`](docs/phase3c_frozen_test_protocol.md) 与
 [`docs/phase3c_frozen_test_results.md`](docs/phase3c_frozen_test_results.md)。
+
+## Phase 4A：训练路径审计与 overfit 子集冻结
+
+官方完全匹配的配置是 `projects/sa2va/configs/sa2va_in30_2b.py`；微调示例是
+`sa2va_finetune.py`。两者的实际可训练集合包括 LLM LoRA、完整 embedding/lm_head、
+InternVL `mlp1`、`text_hidden_fcs` 和 SAM2 mask decoder，并非“仅 LoRA”。Phase 4B 推荐先做 projection-only
+策略 A，但必须先解决 P2 双 `[SEG]` 对齐门禁，并验证官方 HF→PTH→HF 转换闭环。
+
+train-only 清单可确定性重建：
+
+```bash
+projects/sa2va/.venv/bin/python \
+  projects/chartground_edit/scripts/prepare_phase4_overfit_subsets.py \
+  --manifest projects/chartground_edit/data/synthetic_v1/annotations.jsonl \
+  --smoke-output projects/chartground_edit/configs/phase4_smoke1_ids.json \
+  --overfit-output projects/chartground_edit/configs/phase4_overfit32_ids.json
+```
+
+smoke1 固定为 `cgev1_bar_category_6d51bac154`。overfit32 覆盖 16 个
+chart/referring 组合各 2 条，action 各 8，difficulty 为 11/10/11；清单不含 val/test、
+scene/content ID 或图片/mask 副本。详见
+[`docs/phase4_training_path_audit.md`](docs/phase4_training_path_audit.md)、
+[`docs/phase4_training_data_contract.md`](docs/phase4_training_data_contract.md) 和
+[`docs/phase4_overfit_protocol.md`](docs/phase4_overfit_protocol.md)。
 
 ## 开发路线
 

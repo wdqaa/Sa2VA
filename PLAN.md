@@ -178,6 +178,16 @@ execution、mask contract 和 `[SEG]` 均为 64/64；空预测 27/64，nonempty-
 
 ## Phase 4：LoRA/轻量微调
 
+### Phase 4A 实际状态（2026-09-16）
+
+已完成官方 InternVL3-2B/LoRA、dataset、`[SEG]` hidden state、SAM2 与 loss/save/convert
+路径的源码审计；冻结 train-only smoke1（1 条）与 overfit32（16 组合各 2 条），并新增
+不加载模型的纯数据契约与测试。推荐 Phase 4B 首先只训练 `text_hidden_fcs`。本轮没有
+加载 checkpoint、构建模型、执行 forward/backward/optimizer 或访问 val/test 推理。
+审计同时发现冻结 P2 Prompt 与 official assistant target 各含 `[SEG]`，现有
+`Sa2VAModel.forward` 会选中两者并在 `check_obj_number` 中截断/重复；在 labels-aware
+唯一 assistant token 对齐获得批准和测试前，不具备进入 Phase 4B 的条件。
+
 ### 目标
 
 以最小可训练参数验证模型能学习 ChartGround-Edit 的指代分割。

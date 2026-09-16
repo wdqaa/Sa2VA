@@ -1,0 +1,80 @@
+{
+  "distribution": {
+    "chart_referring": {
+      "bar/appearance": 2,
+      "bar/category": 2,
+      "bar/legend": 2,
+      "bar/trend": 2,
+      "confidence_band/appearance": 2,
+      "confidence_band/category": 2,
+      "confidence_band/legend": 2,
+      "confidence_band/trend": 2,
+      "line/appearance": 2,
+      "line/category": 2,
+      "line/legend": 2,
+      "line/trend": 2,
+      "scatter/appearance": 2,
+      "scatter/category": 2,
+      "scatter/legend": 2,
+      "scatter/trend": 2
+    },
+    "difficulty": {
+      "easy": 11,
+      "hard": 11,
+      "medium": 10
+    },
+    "distractor_count": {
+      "2": 11,
+      "3": 10,
+      "4": 11
+    },
+    "edit_action": {
+      "extract": 8,
+      "highlight": 8,
+      "recolor": 8,
+      "remove": 8
+    }
+  },
+  "manifest_sha256": "ebad55fd98356204e572ffe6607a16a34c9dde8a916a9977a7f08bc4aed2ba82",
+  "name": "overfit32",
+  "prompt_variant": "target_only_zh",
+  "sample_count": 32,
+  "sample_ids": [
+    "cgev1_line_category_0232e4ceaf",
+    "cgev1_line_category_2732f9808e",
+    "cgev1_line_appearance_1fe974470a",
+    "cgev1_line_appearance_24f1f512fc",
+    "cgev1_line_legend_0a2ac79ff1",
+    "cgev1_line_legend_2e33f4348d",
+    "cgev1_line_trend_21f466488f",
+    "cgev1_line_trend_afc0a55a98",
+    "cgev1_bar_category_09d73da0ec",
+    "cgev1_bar_category_6d51bac154",
+    "cgev1_bar_appearance_3076b45b61",
+    "cgev1_bar_appearance_f9d2457b7f",
+    "cgev1_bar_legend_19e30da70f",
+    "cgev1_bar_legend_3700839d62",
+    "cgev1_bar_trend_146b80fe87",
+    "cgev1_bar_trend_3d4412f02f",
+    "cgev1_scatter_category_044a151a0a",
+    "cgev1_scatter_category_2372cb2028",
+    "cgev1_scatter_appearance_0452137435",
+    "cgev1_scatter_appearance_84946923c7",
+    "cgev1_scatter_legend_0abb7719b2",
+    "cgev1_scatter_legend_61734ad010",
+    "cgev1_scatter_trend_338d5816bf",
+    "cgev1_scatter_trend_97694092fb",
+    "cgev1_confidence_band_category_131f39f844",
+    "cgev1_confidence_band_category_51d70aca90",
+    "cgev1_confidence_band_appearance_3688f6d05c",
+    "cgev1_confidence_band_appearance_d8230f851e",
+    "cgev1_confidence_band_legend_16bb854aac",
+    "cgev1_confidence_band_legend_3e97a76937",
+    "cgev1_confidence_band_trend_a36a2e31a2",
+    "cgev1_confidence_band_trend_dfffdf966b"
+  ],
+  "selection_rule": "Visit chart/referring groups in generator canonical order. For each group choose two train records by a frozen lexicographic objective: minimize global action imbalance and variance, duplicate action, difficulty imbalance and variance, duplicate difficulty; prefer wider distractor separation; finally break ties by sample_id.",
+  "selection_version": "phase4-overfit-subsets-v1",
+  "source_manifest": "projects/chartground_edit/data/synthetic_v1/annotations.jsonl",
+  "split": "train"
+}

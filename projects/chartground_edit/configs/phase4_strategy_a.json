@@ -1,0 +1,36 @@
+{
+  "config_version": "phase4-strategy-a-v1",
+  "status": "design_only_not_executed",
+  "strategy": "text_hidden_fcs_only",
+  "checkpoint_input_contract": "training-format .pth converted from the frozen HF checkpoint; conversion not run in Phase 4A",
+  "prompt_variant": "target_only_zh",
+  "assistant_target": "Sure, [SEG].",
+  "trainable_modules": [
+    "text_hidden_fcs"
+  ],
+  "frozen_modules": [
+    "mllm.model.language_model",
+    "mllm.model.vision_model",
+    "mllm.model.mlp1",
+    "grounding_encoder"
+  ],
+  "optimizer": {
+    "type": "AdamW",
+    "learning_rate": 0.00004,
+    "betas": [0.9, 0.999],
+    "weight_decay": 0.05,
+    "gradient_clip_max_norm": 1.0
+  },
+  "precision": "bfloat16",
+  "gradient_checkpointing": true,
+  "micro_batch_size": 1,
+  "gradient_accumulation": 1,
+  "phase4b_optimizer_steps": 1,
+  "phase4c_max_optimizer_steps": 400,
+  "seed": 20260916,
+  "output_dir": "/tmp/chartground_edit_phase4b_smoke1",
+  "prohibited_splits": [
+    "val",
+    "test"
+  ]
+}

@@ -1,5 +1,26 @@
 # ChartGround-Edit 实验记录
 
+## 2026-09-16 Phase 4A training-path audit and train-only subset freeze
+
+- 日期：2026-09-16
+- 实验 ID：`phase4a-training-path-audit-overfit-subsets`
+- Git commit：基线 `4bed491`（Phase 3C 已提交）；本轮仅新增/修改 ChartGround-Edit 代码、配置、测试、文档和根计划/实验记录
+- 工作区状态：开始时 clean；未修改 `projects/sa2va/` 上游核心代码
+- 数据版本：冻结 `synthetic_v1` manifest SHA-256 `ebad55fd98356204e572ffe6607a16a34c9dde8a916a9977a7f08bc4aed2ba82`
+- 数据划分与样本数：只读取 train；smoke1=1，overfit32=32；没有对 val/test 运行推理
+- 模型与配置：只读审计 `sa2va_in30_2b.py`、`sa2va_finetune.py` 及训练调用链；没有加载/构建模型或 checkpoint
+- 可训练参数：未运行。静态推荐 A 为 `text_hidden_fcs` 2,754,304 参数；受控 B/C 估算约 616.4M/620.6M，未额外冻结 InternVL `mlp1` 的官方 C 约 629.3M，须实例化后核验
+- 冻结参数：未运行；设计态 A 冻结 MLLM language/vision/mlp1 和整个 SAM2
+- 环境：Python 3.11.16；torch 2.6.0+cu124；transformers 4.57.1；peft 0.17.1；mmengine 0.10.7；xtuner 0.1.23；deepspeed 0.18.0
+- 随机种子：子集选择不使用随机数；未来训练 seed 预注册为 `20260916`
+- 运行命令：schema validate、synthetic_v1 audit、`prepare_phase4_overfit_subsets.py`、独立 subset audit、Phase 4A 专项与 ChartGround-Edit 测试、compileall、diff check；未运行训练命令
+- 实验目的：在任何模型训练前确认真实调用链、冻结最小 train-only 诊断集和资源边界
+- 预设验收条件：Phase 3C 已提交/初始 clean；只用 train；1/32 数量和 16×2 组合；P2 不含隐藏字段；mask 合法；无模型加载或训练
+- 结果：smoke1 为 `cgev1_bar_category_6d51bac154`；overfit32 action 各 8、difficulty easy/medium/hard=11/10/11、distractor 2/3/4=11/10/11。独立 subset audit 通过；Phase 4A 专项 13/13、ChartGround-Edit 全量 154/154 通过（188 条既有 Pillow warning），compileall/diff-check 通过。仓库根 `pytest -q` 仍会收集 `sa2va_eval/projects/ST` 的非本项目脚本，并因缺少 `mmdet`/`projects.ST` 在 collection 阶段失败。官方训练链是 MMEngine/XTuner + InternVL base + Sa2VA `.pth`；官方 LoRA 同时训练/保存 embedding、lm_head，且 `mllm.model.mlp1`、`text_hidden_fcs` 和 SAM2 mask decoder 也可训练
+- 问题：冻结 P2 Prompt 自身含 `[SEG]`，official answer 也含 `[SEG]`；当前 `Sa2VAModel.forward` 不按 labels 过滤，并由 `check_obj_number(fix_number=5)` 截断/重复，未经适配会丢掉 assistant token。HF→PTH 转换也尚未实际验证
+- 结论：Phase 4A 的审计、子集和纯数据边界完成；没有训练指标、梯度、显存或时间结果。推荐 Phase 4B 策略 A，但当前被 token/mask 对齐硬门禁阻止
+- 下一步：审核最小 labels-aware segmentation-position 适配方案；获准后另开 Phase 4B，只执行 1 optimizer step
+
 本文件只记录真实运行过的实验。未运行的字段填写“未运行”，未知字段填写“待确认”，不得用预期值代替结果。每次实验复制以下模板，并按时间倒序追加。
 
 ## 2026-09-16 Phase 3C frozen synthetic_v1 test baseline
