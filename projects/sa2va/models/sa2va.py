@@ -40,10 +40,19 @@ class Sa2VAModel(BaseModel):
                  # grounding-encoder input resolution for the no-mask pseudo data.
                  # 1024 = SAM2 native; set 1008 for the HF SAM3 tracker.
                  grounding_img_size:int=1024,
+                 seg_token_selection:Literal['all', 'supervised_labels']='all',
+                 object_count_policy:Literal['legacy_fix_number', 'strict_one_to_one']='legacy_fix_number',
+                 expected_masks_per_sample=None,
+                 ignore_index:int=-100,
                  ):
         super().__init__()
         if special_tokens is None:
             special_tokens = ['[SEG]']
+        self.seg_token_selection = seg_token_selection
+        self.object_count_policy = object_count_policy
+        self.expected_masks_per_sample = expected_masks_per_sample
+        self.ignore_index = ignore_index
+        self._validate_alignment_config()
 
         self.mllm = BUILDER.build(mllm)
         self.arch_type = arch_type
@@ -147,6 +156,119 @@ class Sa2VAModel(BaseModel):
         self.mllm.add_special_tokens(tokenizer, special_tokens)
         self.seg_token_idx = tokenizer("[SEG]", add_special_tokens=False).input_ids[0] # required to make add_special_tokens to be False to avoid <bos> or <eos>
 
+    def _validate_alignment_config(self):
+        valid_selections = {'all', 'supervised_labels'}
+        valid_policies = {'legacy_fix_number', 'strict_one_to_one'}
+        if self.seg_token_selection not in valid_selections:
+            raise ValueError(
+                f'Unsupported seg_token_selection={self.seg_token_selection!r}; '
+                f'expected one of {sorted(valid_selections)}')
+        if self.object_count_policy not in valid_policies:
+            raise ValueError(
+                f'Unsupported object_count_policy={self.object_count_policy!r}; '
+                f'expected one of {sorted(valid_policies)}')
+        if self.object_count_policy == 'strict_one_to_one':
+            if self.seg_token_selection != 'supervised_labels':
+                raise ValueError(
+                    'strict_one_to_one requires '
+                    'seg_token_selection="supervised_labels"')
+            if self.expected_masks_per_sample != 1:
+                raise ValueError(
+                    'strict_one_to_one requires expected_masks_per_sample=1')
+        elif self.expected_masks_per_sample is not None:
+            raise ValueError(
+                'expected_masks_per_sample is only valid with '
+                'object_count_policy="strict_one_to_one"')
+        if not isinstance(self.ignore_index, int) or isinstance(self.ignore_index, bool):
+            raise TypeError('ignore_index must be an int')
+
+    def select_seg_token_mask(self, input_ids, labels=None):
+        """Select segmentation positions without changing language-model labels."""
+        if not isinstance(input_ids, torch.Tensor):
+            raise TypeError('input_ids must be a torch.Tensor')
+        if input_ids.ndim != 2:
+            raise ValueError(
+                f'input_ids must have shape [batch, sequence], got {tuple(input_ids.shape)}')
+        seg_token_mask = input_ids == self.seg_token_idx
+        if self.seg_token_selection == 'all':
+            return seg_token_mask
+
+        if labels is None:
+            raise ValueError(
+                'labels are required when seg_token_selection="supervised_labels"')
+        if not isinstance(labels, torch.Tensor):
+            raise TypeError('labels must be a torch.Tensor')
+        if labels.shape != input_ids.shape:
+            raise ValueError(
+                'labels shape must match input_ids shape: '
+                f'{tuple(labels.shape)} != {tuple(input_ids.shape)}')
+        if labels.device != input_ids.device:
+            raise ValueError(
+                'labels and input_ids must be on the same device: '
+                f'{labels.device} != {input_ids.device}')
+        if input_ids.dtype != torch.long or labels.dtype != torch.long:
+            raise TypeError(
+                'labels and input_ids must both use torch.long: '
+                f'labels={labels.dtype}, input_ids={input_ids.dtype}')
+        return seg_token_mask & (labels != self.ignore_index)
+
+    def validate_strict_alignment(self, seg_token_mask, gt_masks, sample_ids=None):
+        """Fail closed before model execution for strict single-object batches."""
+        if self.object_count_policy != 'strict_one_to_one':
+            return
+        batch_size = seg_token_mask.shape[0]
+        if gt_masks is None:
+            raise ValueError(
+                'strict alignment failed: GT masks are missing; '
+                'object_count_policy=strict_one_to_one')
+        if len(gt_masks) != batch_size:
+            raise ValueError(
+                'strict alignment failed: GT mask batch size does not match token batch; '
+                f'token_batch={batch_size}; mask_batch={len(gt_masks)}; '
+                'object_count_policy=strict_one_to_one')
+        if sample_ids is None:
+            sample_ids = [f'batch_index={index}' for index in range(batch_size)]
+        if len(sample_ids) != batch_size:
+            raise ValueError(
+                'strict alignment failed: sample_id batch size does not match token batch; '
+                f'token_batch={batch_size}; sample_id_batch={len(sample_ids)}; '
+                'object_count_policy=strict_one_to_one')
+
+        failures = []
+        records = []
+        for index, (sample_id, sample_mask) in enumerate(zip(sample_ids, gt_masks)):
+            token_positions = torch.nonzero(
+                seg_token_mask[index], as_tuple=False).flatten().tolist()
+            supervised_count = len(token_positions)
+            if not isinstance(sample_mask, torch.Tensor) or sample_mask.ndim != 3:
+                gt_count = 'invalid'
+            else:
+                gt_count = int(sample_mask.shape[0])
+            record = {
+                'sample_id': str(sample_id),
+                'supervised_seg_count': supervised_count,
+                'gt_mask_count': gt_count,
+                'token_positions': token_positions,
+                'object_count_policy': self.object_count_policy,
+            }
+            records.append(record)
+            if (
+                supervised_count != self.expected_masks_per_sample
+                or gt_count != self.expected_masks_per_sample
+                or supervised_count != gt_count
+            ):
+                failures.append(record)
+        self.last_alignment_records = records
+        if failures:
+            details = '; '.join(
+                'sample_id={sample_id}; supervised_seg_count={supervised_seg_count}; '
+                'gt_mask_count={gt_mask_count}; token_positions={token_positions}; '
+                'object_count_policy={object_count_policy}'.format(**record)
+                for record in failures
+            )
+            raise ValueError(f'strict alignment failed: {details}')
+        print(f'Sa2VA strict alignment records: {records}', flush=True)
+
     def load_state_dict(self, state_dict, strict: bool = True, assign: bool = False):
         return super().load_state_dict(state_dict, strict, assign)
 
@@ -219,7 +341,12 @@ class Sa2VAModel(BaseModel):
         g_pixel_values = data.pop('g_pixel_values', None)
         gt_masks = data.pop('masks', None)
         frames_per_batch = data.pop('frames_per_batch', None)
+        sample_ids = data.pop('sample_ids', None)
+        data.pop('alignment_records', None)
         input_ids = data['input_ids']
+        seg_token_mask = self.select_seg_token_mask(
+            input_ids, labels=data.get('labels'))
+        self.validate_strict_alignment(seg_token_mask, gt_masks, sample_ids)
         output = self.mllm(data, data_samples, mode)
 
         if gt_masks is None:
@@ -237,8 +364,6 @@ class Sa2VAModel(BaseModel):
             mask_shape = mask.shape[-2:]
             ori_size_list += [mask_shape] * frames_per_batch[i_bs]
 
-        seg_token_mask = input_ids == self.seg_token_idx
-
         hidden_states = output.hidden_states
         hidden_states = self.text_hidden_fcs(hidden_states[-1])
 
@@ -253,17 +378,21 @@ class Sa2VAModel(BaseModel):
             seg_token_counts += 5
 
         pred_embeddings_list_ = torch.split(pred_embeddings, seg_token_counts.tolist(), dim=0)
-        pred_embeddings_list = []
-        for item in pred_embeddings_list_:
-            if len(item) != 0:
-                pred_embeddings_list.append(item)
+        if self.object_count_policy == 'strict_one_to_one':
+            pred_embeddings_list = list(pred_embeddings_list_)
+        else:
+            pred_embeddings_list = []
+            for item in pred_embeddings_list_:
+                if len(item) != 0:
+                    pred_embeddings_list.append(item)
         pred_embeddings_list_video = self.generate_video_pred_embeddings(
             pred_embeddings_list, frames_per_batch)
 
         gt_masks_video = self.process_video_gt_masks(gt_masks, frames_per_batch)
-        pred_embeddings_list_video, gt_masks_video = self.check_obj_number(
-            pred_embeddings_list_video, gt_masks_video
-        )
+        if self.object_count_policy == 'legacy_fix_number':
+            pred_embeddings_list_video, gt_masks_video = self.check_obj_number(
+                pred_embeddings_list_video, gt_masks_video
+            )
         g_pixel_values = torch.stack([
             self.grounding_encoder.preprocess_image(pixel) for pixel in g_pixel_values
         ])

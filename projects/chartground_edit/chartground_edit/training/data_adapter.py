@@ -11,8 +11,8 @@ from typing import Any, Sequence
 import numpy as np
 from PIL import Image
 
-from chartground_edit.datasets.schema_v1 import validate_jsonl_v1
-from chartground_edit.inference.prompt_variants import TARGET_ONLY_ZH, build_prompt_variant
+from ..datasets.schema_v1 import validate_jsonl_v1
+from ..inference.prompt_variants import TARGET_ONLY_ZH, build_prompt_variant
 
 
 EXPECTED_MANIFEST_SHA256 = (

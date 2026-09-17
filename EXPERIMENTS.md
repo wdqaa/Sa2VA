@@ -1,5 +1,26 @@
 # ChartGround-Edit 实验记录
 
+## 2026-09-17 Phase 4B-0 alignment hard gate and parse-only smoke config
+
+- 日期：2026-09-17
+- 实验 ID：`phase4b0-labels-aware-strict-alignment`
+- Git commit：基线 `5f20686`（Phase 4A 已提交）；本轮工作区只含待审 Phase 4B-0 改动
+- 工作区状态：开始时 clean；对 `projects/sa2va/models/sa2va.py` 做最小、默认兼容的训练侧修改，其余实现位于 ChartGround-Edit
+- 数据：只读取 synthetic_v1 train smoke1 `cgev1_bar_category_6d51bac154`；未读取 val/test
+- 环境：Python 3.11.16；torch 2.6.0+cu124；transformers 4.57.1；tokenizers 0.22.1；mmengine 0.10.7；xtuner 0.1.23
+- 模型/权重：未构建模型，未加载权重，未执行 forward/backward/optimizer，未运行训练或推理
+- 静态目的：用真实 tokenizer/collator 复现 P2+official target 的双 `[SEG]`，实现 labels-aware selection、strict 1:1 和可解析的一步配置
+- tokenizer/collator 结果：sequence length 1844；`seg_token_idx=151674`；user `[SEG]` position 1823、label=-100；assistant `[SEG]` position 1840、label=151674；旧选择 `[1823,1840]`，新选择 `[1840]`
+- mask 结果：GT `torch.uint8 [1,320,480]`，值域 `{0,1}`，前景 8127；MLLM tiles `[7,3,448,448]`，SAM image `[3,1024,1024]`；collator strict 1:1 通过
+- legacy 复现：`check_obj_number(fix_number=5)` 前为 2 token/1 mask，先截断为 1/1 后重复，最终 5/5；strict 路径不调用该函数
+- 配置：`phase4b_smoke1.py` 已静态解析；train-only smoke1、P2、strategy A、batch=1、accumulation=1、BF16、max_iters=1、seed=20260916、无 val/test/resume、work_dir 在 `/tmp`
+- 可训练参数：未实例化验证；配置预注册并在未来 runtime 强制核验 `text_hidden_fcs` only、2,754,304 params
+- loss/gradient/显存：未运行
+- checkpoint 审计：输入应为固定 revision 的完整 Sa2VA HF 经 `convert_to_pth.py` 产生的约 8.1 GiB full BF16 raw state dict；输出为 `/tmp/chartground_edit_phase4b_smoke1/iter_1.pth` 的 `text_hidden_fcs` subset，预计约 11 MiB raw tensors。转换、保存和重载均未运行
+- 结果：alignment 专项 20/20、Phase 4A+4B-0 专项 33/33、ChartGround-Edit 限定全量 174/174 通过（193 warnings，均为既有 Pillow、NVML/CPU 环境或第三方 SWIG warning）；smoke1 真实诊断、compileall、配置解析和 `git diff --check` 均通过
+- 结论：双 `[SEG]` 和 `fix_number=5` 代码门禁已解除；Phase 4B-1 仍被唯一 checkpoint materialization/round-trip 门禁阻止（缺独立 InternVL3-2B base，full PTH 未转换，projection subset→HF 未实测）
+- 详细协议：`projects/chartground_edit/docs/phase4b_alignment_protocol.md`
+
 ## 2026-09-16 Phase 4A training-path audit and train-only subset freeze
 
 - 日期：2026-09-16

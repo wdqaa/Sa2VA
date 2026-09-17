@@ -1,6 +1,6 @@
 # Phase 4B/4C 预注册 overfit 协议
 
-状态：**仅设计，未执行**。本协议不授权加载模型或启动训练。
+状态：**Phase 4B-0 静态门禁已实现；训练仍未执行**。本协议不授权加载模型或启动训练。
 
 ## 共同冻结项与代码边界
 
@@ -15,8 +15,9 @@
   grad clip max-norm 1，沿用官方数值。language gradient checkpointing 保持官方开启。
 - 输出只能写 `/tmp/chartground_edit_phase4b_smoke1` 或
   `/tmp/chartground_edit_phase4c_overfit32`，不得写 repo root 或 dataset tree。
-- 任何执行前必须解决 data contract 记录的 P2 双 `[SEG]` / `fix_number=5` hard gate；
-  必须使用 labels-aware 唯一 assistant `[SEG]` 且 mask 数量不符时 fail closed。不得改 P2。
+- P2 双 `[SEG]` / `fix_number=5` 代码门禁已由 labels-aware + strict one-to-one 解决并通过
+  真实 tokenizer/collator 静态验证。执行前仍必须完成 full PTH materialization 和
+  HF→PTH→训练 subset→HF round-trip 审计；不得改 P2。
 - 显存软上限 22,000 MiB；超过立即完整停止该实验，不把 OOM 前的部分状态当结果。
 
 ## Phase 4B：1-sample / 1 optimizer step
@@ -39,8 +40,8 @@ accumulation=1，只允许 1 个 optimizer step，不设 epoch 重复过拟合�
 10. 再经 `tools/convert_to_hf.py` 导出临时 HF 目录，新进程用现有 inference backend 对同一
     train 样本输出 contract-valid mask。编辑、val/test 均不运行。
 
-任何一项失败即 Phase 4B 失败，不能增加 step 诊断。建议命令（仅在 hard gate 已解决、
-未来生成真正的 MMEngine config 后执行；当前不存在可运行 config，因此本轮不得运行）：
+任何一项失败即 Phase 4B 失败，不能增加 step 诊断。配置已经创建并通过静态解析；以下
+命令只能在 checkpoint materialization 门禁另行通过后运行：
 
 ```bash
 CUDA_VISIBLE_DEVICES=<FREE_GPU_INDEX> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
@@ -49,6 +50,11 @@ projects/sa2va/.venv/bin/python tools/train.py \
   --work-dir /tmp/chartground_edit_phase4b_smoke1 \
   --launcher none --seed 20260916
 ```
+
+运行前必须设置 `CHARTGROUND_BASE_MODEL_PATH`（独立 InternVL3-2B base）和
+`CHARTGROUND_SA2VA_PTH`（由固定 Sa2VA HF revision 转出的 full BF16 PTH）。单步训练
+checkpoint 是 `text_hidden_fcs` state_dict 子集，不是 LoRA adapter 或完整 PTH；完整重载
+方案见 `phase4b_alignment_protocol.md`。
 
 ## Phase 4C：32-sample memorization
 

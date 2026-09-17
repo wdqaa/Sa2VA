@@ -155,7 +155,7 @@ def test_selection_with_nontrain_id_is_rejected(tmp_path: Path) -> None:
 
 def test_strategy_config_is_explicit_and_safe() -> None:
     plan = json.loads(PLAN.read_text(encoding="utf-8"))
-    assert plan["status"] == "design_only_not_executed"
+    assert plan["status"] == "phase4b0_static_validated_not_executed"
     assert plan["prompt_variant"] == TARGET_ONLY_ZH
     assert plan["trainable_modules"] == ["text_hidden_fcs"]
     assert set(plan["frozen_modules"]) == {

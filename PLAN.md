@@ -188,6 +188,20 @@ execution、mask contract 和 `[SEG]` 均为 64/64；空预测 27/64，nonempty-
 `Sa2VAModel.forward` 会选中两者并在 `check_obj_number` 中截断/重复；在 labels-aware
 唯一 assistant token 对齐获得批准和测试前，不具备进入 Phase 4B 的条件。
 
+### Phase 4B-0 实际状态（2026-09-17）
+
+已用本地真实 tokenizer、官方 conversation encoding/图像预处理和 collator 在 smoke1
+复现双 `[SEG]`：user/assistant positions=1823/1840，labels=-100/151674。已加入显式
+labels-aware token selection 和 strict one-to-one policy；strict 在 MLLM forward 前检查并
+绕过 `fix_number=5`，默认 legacy 与推理路径不变。P2 未修改。已创建只训练
+`text_hidden_fcs` 的 parse-only 单步配置、正式 dataset/collator bridge、fail-fast/runtime
+metadata 和专项测试；没有构建模型、加载权重、执行 forward/backward/optimizer 或
+val/test。
+
+Phase 4B-1 尚未获准开始。剩余唯一门禁是 checkpoint materialization/round-trip：本机
+缺少独立 InternVL3-2B base，且固定 Sa2VA HF revision 尚未实际转 full PTH，也未验证
+projection-only checkpoint 经 `convert_to_hf.py` 的完整重载。
+
 ### 目标
 
 以最小可训练参数验证模型能学习 ChartGround-Edit 的指代分割。

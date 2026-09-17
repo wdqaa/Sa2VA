@@ -44,7 +44,7 @@ EOS 的 labels 为真实 token ID。因此语言 loss 只监督 answer/EOS。
 `Sa2VAModel.forward` 用 nearest 把 GT resize 到 low-resolution mask logits 的空间尺寸，
 mask loss 在该分辨率计算。schema 已禁止空 GT；本项目不定义空 GT 训练语义。
 
-## 当前对齐冲突（Phase 4B hard gate）
+## 对齐冲突与 Phase 4B-0 解决方案
 
 “assistant target 恰好一个 `[SEG]`”并不等于完整 token 序列只有一个：冻结 P2 本身也
 含 `[SEG]`，所以完整对话有两个。官方 `Sa2VAModel.forward` 目前用
@@ -53,11 +53,12 @@ mask loss 在该分辨率计算。schema 已禁止空 GT；本项目不定义空
 P2+official target 会选择用户 Prompt 的 `[SEG]` hidden state，丢弃 assistant 的
 `[SEG]`，再把唯一 pair 重复五份。
 
-Phase 4B 必须在任何 forward 前增加无模型单测，证明 segmentation mask 只选择
-`(input_ids == seg_token_idx) & (labels != -100)` 的唯一位置，并明确静态一 mask 样本不被
-静默数量修复。若这一最小训练侧适配未获批准或无法避免复制核心 forward，则停止，不
-执行 forward/backward。不得通过改写 P2、移除 P2 中的 `[SEG]` 或去掉 assistant target
-来规避。
+Phase 4B-0 已实现并用真实 tokenizer/collator 验证：segmentation mask 只选择
+`(input_ids == seg_token_idx) & (labels != -100)` 的唯一 assistant 位置。项目 collator 和
+训练模型入口都执行 strict one-to-one 检查；数量不符会携带 sample ID、两侧数量、token
+位置和 policy 报错。strict 分支在进入 legacy `check_obj_number(fix_number=5)` 前阻止，
+并且根本不调用该函数。P2 和 assistant target 均未删改。完整证据见
+`phase4b_alignment_protocol.md`。
 
 ## 纯数据实现
 
@@ -66,8 +67,10 @@ Sa2VA/Transformers。它强制 manifest hash、selection hash、唯一 ID 和 `s
 再读取 RGB 和二值 mask。它保持现有 v0/v1 reader 不变；训练契约只消费 v1。
 
 审计字段不会出现在 `Phase4DataSample` 中。模型侧字段固定为 `sample_id,image,mask,
-image_width,image_height,prompt,assistant_target`。实际 tokenizer/tile/SAM tensor 由未来
-官方 dataset bridge 生成；本轮没有伪造 token ID 或模型 tensor。
+image_width,image_height,prompt,assistant_target`。`ChartGroundPhase4Dataset` 已作为正式
+bridge 复用官方 tokenizer、动态图块、SAM resize、conversation encoding 和 collator。
+它不启用随机 crop/flip；GT 保持原图尺寸，SAM 图像和 loss 前的 GT resize 都是完整画幅
+的对应缩放。
 
 ## 冻结子集
 

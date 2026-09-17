@@ -1,8 +1,12 @@
 {
   "config_version": "phase4-strategy-a-v1",
-  "status": "design_only_not_executed",
+  "status": "phase4b0_static_validated_not_executed",
   "strategy": "text_hidden_fcs_only",
   "checkpoint_input_contract": "training-format .pth converted from the frozen HF checkpoint; conversion not run in Phase 4A",
+  "seg_token_selection": "supervised_labels",
+  "object_count_policy": "strict_one_to_one",
+  "expected_masks_per_sample": 1,
+  "ignore_index": -100,
   "prompt_variant": "target_only_zh",
   "assistant_target": "Sure, [SEG].",
   "trainable_modules": [

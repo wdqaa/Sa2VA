@@ -298,6 +298,19 @@ scene/content ID 或图片/mask 副本。详见
 [`docs/phase4_training_data_contract.md`](docs/phase4_training_data_contract.md) 和
 [`docs/phase4_overfit_protocol.md`](docs/phase4_overfit_protocol.md)。
 
+## Phase 4B-0：训练对齐硬门禁
+
+真实 tokenizer/collator 证明 smoke1 的用户 `[SEG]` 在 position 1823、label=-100，assistant
+`[SEG]` 在 position 1840、label=151674。旧逻辑选择两个并由 `fix_number=5` 静默变成
+5 对；新训练配置按 labels 边界只选择 assistant token，并要求每样本严格 1 token : 1
+mask。任何不匹配立即报错，strict 路径不调用 legacy 修复。默认上游配置仍保留旧行为，
+推理路径未改。
+
+已创建 parse-only 的 `configs/phase4b_smoke1.py`：smoke1/train-only、P2、strategy A、
+batch/accumulation=1、BF16、max_iters=1、无 val/test/resume，输出仅到 `/tmp`。本轮没有
+构建模型、加载权重或训练。完整复现、配置与 checkpoint 输入输出门禁见
+[`docs/phase4b_alignment_protocol.md`](docs/phase4b_alignment_protocol.md)。
+
 ## 开发路线
 
 1. Phase 0：完成 Sa2VA 源码地图、环境边界和工程骨架。

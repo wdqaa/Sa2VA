@@ -11,8 +11,8 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
-from chartground_edit.datasets.schema_v1 import validate_jsonl_v1
-from chartground_edit.datasets.synthetic_v1 import (
+from ..datasets.schema_v1 import validate_jsonl_v1
+from ..datasets.synthetic_v1 import (
     ACTION_ORDER_V1,
     CHART_ORDER_V1,
     REFERRING_ORDER_V1,
