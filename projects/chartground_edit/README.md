@@ -2,7 +2,11 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：Phase 1–3C、Phase 4A 和 Phase 4B 单样本单步门禁已完成。P2 `target_only_zh` 保持冻结；真实 Sa2VA-InternVL3-2B 已仅用 `text_hidden_fcs` 完成恰好一次 forward/backward/optimizer.step，loss、梯度、冻结边界、参数更新和 projection-only checkpoint 重载均通过。尚未运行 Phase 4C 32-sample overfit 或任何完整训练。
+当前状态：Phase 1–3C、Phase 4A/4B 和 Phase 4C overfit32 已完成。P2
+`target_only_zh` 保持冻结；真实 Sa2VA-InternVL3-2B 仅训练 `text_hidden_fcs`，在固定
+32 条 train 样本上完成 320 steps。训练集 16-group Macro IoU 从 `0.164664` 提升至
+`0.569468`，empty rate 从 `43.75%` 降至 `0%`，通过 projection-only learnability
+门槛。该结果不是泛化指标；尚未运行完整训练。
 
 ## MVP
 
@@ -340,6 +344,33 @@ projects/sa2va/.venv/bin/python \
 输出 `iter_1.pth` 为 11,020,648 bytes，只含四个 FP32 projection tensor 和身份/对齐
 metadata；保存值与内存一致，并已通过清零后正式 loader 精确重载。该 smoke 不评价
 IoU，也没有运行 val/test；它只解除进入预注册 Phase 4C 32-sample overfit 的工程门禁。
+
+## Phase 4C：overfit32 projection-only
+
+配置固定为 train-only overfit32、10 epoch/320 steps、batch/accumulation=1、BF16，且
+只训练 2,754,304 个 `text_hidden_fcs` 参数。实际运行命令如下；模型路径均由 CLI
+提供，未写入版本化配置：
+
+```bash
+CUDA_VISIBLE_DEVICES=<FREE_GPU> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+projects/sa2va/.venv/bin/python \
+  projects/chartground_edit/scripts/run_phase4c_train.py \
+  --config projects/chartground_edit/configs/phase4c_overfit32.py \
+  --base-model <LOCAL_INTERNVL3_2B> \
+  --full-pth <LOCAL_SA2VA_FULL_BF16_PTH> \
+  --full-pth-sha256 <VERIFIED_SHA256> \
+  --output-dir /tmp/chartground_edit_phase4c_overfit32 \
+  --base-repo-id OpenGVLab/InternVL3-2B \
+  --base-revision 899155015275a9b7338c7f4677e19c784e0e5a21 \
+  --sa2va-hf-revision 15837dcaecc304714a1f0f069e74f47e47521c7f
+```
+
+step32/128/320 的 16-group Macro IoU 分别为 `0.359869 / 0.509776 / 0.569468`，
+baseline 为 `0.164664`；best 为 step320。生产 backend 的可选 projection loader
+严格接受四个预期 tensor，未传 checkpoint 时恢复原始 HF projection。完整训练日志、
+checkpoint 和 mask 留在 `/tmp`；紧凑指标与确定性 16-group gallery 见
+[`docs/phase4c_overfit32_results.md`](docs/phase4c_overfit32_results.md) 和
+[`assets/phase4c_overfit32_gallery.png`](assets/phase4c_overfit32_gallery.png)。
 
 ## 开发路线
 

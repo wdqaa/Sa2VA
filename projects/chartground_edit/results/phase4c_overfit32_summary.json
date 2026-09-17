@@ -1,0 +1,481 @@
+{
+  "best_checkpoint": "step320",
+  "checkpoint_order": [
+    "baseline",
+    "step32",
+    "step128",
+    "step320"
+  ],
+  "checkpoints": {
+    "baseline": {
+      "delta_vs_baseline": {
+        "group_macro_dice": 0.0,
+        "group_macro_iou": 0.0,
+        "sample_macro_dice": 0.0,
+        "sample_macro_iou": 0.0
+      },
+      "empty_rate": 0.4375,
+      "group_macro_dice": 0.18972935826452475,
+      "group_macro_iou": 0.16466400138885406,
+      "groups": {
+        "bar/appearance": {
+          "count": 2,
+          "empty_rate": 1.0,
+          "mean_dice": 0.0,
+          "mean_iou": 0.0
+        },
+        "bar/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.9776373450017903,
+          "mean_iou": 0.9562529902853594
+        },
+        "bar/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.5167863815166444,
+          "mean_iou": 0.491659253650219
+        },
+        "bar/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.0,
+          "mean_iou": 0.0
+        },
+        "confidence_band/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.0,
+          "mean_iou": 0.0
+        },
+        "confidence_band/category": {
+          "count": 2,
+          "empty_rate": 1.0,
+          "mean_dice": 0.0,
+          "mean_iou": 0.0
+        },
+        "confidence_band/legend": {
+          "count": 2,
+          "empty_rate": 0.5,
+          "mean_dice": 0.2991228824490498,
+          "mean_iou": 0.21339181645297833
+        },
+        "confidence_band/trend": {
+          "count": 2,
+          "empty_rate": 0.5,
+          "mean_dice": 0.0,
+          "mean_iou": 0.0
+        },
+        "line/appearance": {
+          "count": 2,
+          "empty_rate": 1.0,
+          "mean_dice": 0.0,
+          "mean_iou": 0.0
+        },
+        "line/category": {
+          "count": 2,
+          "empty_rate": 0.5,
+          "mean_dice": 0.45154873543620344,
+          "mean_iou": 0.4116580310880829
+        },
+        "line/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.0,
+          "mean_iou": 0.0
+        },
+        "line/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.44715010035049957,
+          "mean_iou": 0.3534296855441579
+        },
+        "scatter/appearance": {
+          "count": 2,
+          "empty_rate": 1.0,
+          "mean_dice": 0.0,
+          "mean_iou": 0.0
+        },
+        "scatter/category": {
+          "count": 2,
+          "empty_rate": 1.0,
+          "mean_dice": 0.0,
+          "mean_iou": 0.0
+        },
+        "scatter/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.34256591837949624,
+          "mean_iou": 0.20780269193626266
+        },
+        "scatter/trend": {
+          "count": 2,
+          "empty_rate": 0.5,
+          "mean_dice": 0.0008583690987124463,
+          "mean_iou": 0.000429553264604811
+        }
+      },
+      "micro_dice": 0.22446459251194992,
+      "micro_iou": 0.12642079204126525,
+      "nonempty_disjoint_rate": 0.21875,
+      "overlap_rate": 0.34375,
+      "sample_count": 32,
+      "sample_macro_dice": 0.18972935826452475,
+      "sample_macro_iou": 0.16466400138885406
+    },
+    "step128": {
+      "delta_vs_baseline": {
+        "group_macro_dice": 0.41579917575514025,
+        "group_macro_iou": 0.3451121527722245,
+        "sample_macro_dice": 0.41579917575514025,
+        "sample_macro_iou": 0.3451121527722245
+      },
+      "empty_rate": 0.0,
+      "group_macro_dice": 0.605528534019665,
+      "group_macro_iou": 0.5097761541610786,
+      "groups": {
+        "bar/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.9500696553967153,
+          "mean_iou": 0.9049119349107853
+        },
+        "bar/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.9818162403455836,
+          "mean_iou": 0.9642823174510956
+        },
+        "bar/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.9858097191898754,
+          "mean_iou": 0.9720747320885144
+        },
+        "bar/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.4822029033051751,
+          "mean_iou": 0.46562920725429635
+        },
+        "confidence_band/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.9101041757250459,
+          "mean_iou": 0.8394236610556698
+        },
+        "confidence_band/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.5202073034013829,
+          "mean_iou": 0.4908812796024536
+        },
+        "confidence_band/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.6705003922253931,
+          "mean_iou": 0.5048831432488972
+        },
+        "confidence_band/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.6945291092957423,
+          "mean_iou": 0.554057917047668
+        },
+        "line/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.24625247633722208,
+          "mean_iou": 0.1454031500117963
+        },
+        "line/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.5867928670924272,
+          "mean_iou": 0.49137330274346547
+        },
+        "line/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.44107269175214037,
+          "mean_iou": 0.3007132078551284
+        },
+        "line/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.612253284420486,
+          "mean_iou": 0.4902742946481774
+        },
+        "scatter/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.525603985071707,
+          "mean_iou": 0.3713088858205986
+        },
+        "scatter/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.35324893071000857,
+          "mean_iou": 0.21493630750122436
+        },
+        "scatter/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.34479404009113945,
+          "mean_iou": 0.20925447948228781
+        },
+        "scatter/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.383198769954595,
+          "mean_iou": 0.237010645855199
+        }
+      },
+      "micro_dice": 0.7338121442079055,
+      "micro_iou": 0.5795444497837579,
+      "nonempty_disjoint_rate": 0.03125,
+      "overlap_rate": 0.96875,
+      "sample_count": 32,
+      "sample_macro_dice": 0.605528534019665,
+      "sample_macro_iou": 0.5097761541610786
+    },
+    "step32": {
+      "delta_vs_baseline": {
+        "group_macro_dice": 0.2573861286001853,
+        "group_macro_iou": 0.19520450504926679,
+        "sample_macro_dice": 0.2573861286001853,
+        "sample_macro_iou": 0.19520450504926679
+      },
+      "empty_rate": 0.03125,
+      "group_macro_dice": 0.44711548686471003,
+      "group_macro_iou": 0.35986850643812085,
+      "groups": {
+        "bar/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.8423274068923388,
+          "mean_iou": 0.7375330629970431
+        },
+        "bar/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.9808134441814904,
+          "mean_iou": 0.9623496434189577
+        },
+        "bar/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.97276663825232,
+          "mean_iou": 0.9472163966233389
+        },
+        "bar/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.3605934778205388,
+          "mean_iou": 0.2819751326522531
+        },
+        "confidence_band/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.4656245487160789,
+          "mean_iou": 0.33973640551356166
+        },
+        "confidence_band/category": {
+          "count": 2,
+          "empty_rate": 0.5,
+          "mean_dice": 0.4802838831154724,
+          "mean_iou": 0.462063680066885
+        },
+        "confidence_band/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.21262458581948648,
+          "mean_iou": 0.12741565800596596
+        },
+        "confidence_band/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.2537829158638407,
+          "mean_iou": 0.158507693671214
+        },
+        "line/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.023035768772615144,
+          "mean_iou": 0.011690833913364897
+        },
+        "line/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.5526483633098419,
+          "mean_iou": 0.4615925295359647
+        },
+        "line/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.12029033768164203,
+          "mean_iou": 0.06402808348553676
+        },
+        "line/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.5152353360190112,
+          "mean_iou": 0.3625952688843062
+        },
+        "scatter/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.40312205447059013,
+          "mean_iou": 0.25956891772915514
+        },
+        "scatter/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.309359364296668,
+          "mean_iou": 0.18302864160200655
+        },
+        "scatter/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.30431073908959294,
+          "mean_iou": 0.1812601185645929
+        },
+        "scatter/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.35702892553383225,
+          "mean_iou": 0.21733403634578763
+        }
+      },
+      "micro_dice": 0.5589815652013661,
+      "micro_iou": 0.38790729646666694,
+      "nonempty_disjoint_rate": 0.03125,
+      "overlap_rate": 0.9375,
+      "sample_count": 32,
+      "sample_macro_dice": 0.44711548686471003,
+      "sample_macro_iou": 0.35986850643812085
+    },
+    "step320": {
+      "delta_vs_baseline": {
+        "group_macro_dice": 0.48507619841283467,
+        "group_macro_iou": 0.4048042522026323,
+        "sample_macro_dice": 0.48507619841283467,
+        "sample_macro_iou": 0.4048042522026323
+      },
+      "empty_rate": 0.0,
+      "group_macro_dice": 0.6748055566773594,
+      "group_macro_iou": 0.5694682535914863,
+      "groups": {
+        "bar/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.967193199556657,
+          "mean_iou": 0.9364992970141002
+        },
+        "bar/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.9794670349248497,
+          "mean_iou": 0.9597603225819349
+        },
+        "bar/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.9832747522520549,
+          "mean_iou": 0.9672222549545919
+        },
+        "bar/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.761356980415334,
+          "mean_iou": 0.6641187690498933
+        },
+        "confidence_band/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.9129687449262531,
+          "mean_iou": 0.8445408162768988
+        },
+        "confidence_band/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.6515294646038462,
+          "mean_iou": 0.5714462969483495
+        },
+        "confidence_band/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.6720139562502389,
+          "mean_iou": 0.5070824568630475
+        },
+        "confidence_band/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.7667549963385394,
+          "mean_iou": 0.6483692073590799
+        },
+        "line/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.3580889869095603,
+          "mean_iou": 0.24996953755514711
+        },
+        "line/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.6016125614616245,
+          "mean_iou": 0.5032983503876812
+        },
+        "line/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.5321296506647033,
+          "mean_iou": 0.3876357134725054
+        },
+        "line/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.6809636924671386,
+          "mean_iou": 0.5573086326431785
+        },
+        "scatter/appearance": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.6395873015873016,
+          "mean_iou": 0.4850740579017043
+        },
+        "scatter/category": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.43651637057799464,
+          "mean_iou": 0.28089018627643714
+        },
+        "scatter/legend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.3894991770882607,
+          "mean_iou": 0.2442674197348153
+        },
+        "scatter/trend": {
+          "count": 2,
+          "empty_rate": 0.0,
+          "mean_dice": 0.46393203681339273,
+          "mean_iou": 0.3040087384444162
+        }
+      },
+      "micro_dice": 0.7933556394010584,
+      "micro_iou": 0.6574892033699645,
+      "nonempty_disjoint_rate": 0.0,
+      "overlap_rate": 1.0,
+      "sample_count": 32,
+      "sample_macro_dice": 0.6748055566773594,
+      "sample_macro_iou": 0.5694682535914863
+    }
+  },
+  "model_load_attempts": 1,
+  "model_load_time_ms": 8567.478984594345,
+  "peak_gpu_memory_mb": 5010.5537109375,
+  "reference_baseline_exact": true,
+  "sample_count": 32,
+  "split": "train"
+}

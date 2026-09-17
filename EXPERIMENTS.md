@@ -1,5 +1,27 @@
 # ChartGround-Edit 实验记录
 
+## 2026-09-17 Phase 4C overfit32 projection-only
+
+- 日期：2026-09-17
+- 实验 ID：`phase4c-overfit32-text-hidden-fcs-only`
+- Git commit：基线 `69ecd57`；Phase 4B-1 已提交，开始时工作区 clean
+- 数据：仅 synthetic_v1 train 的冻结 overfit32；16 个 chart/referring 组合各 2 条；每条恰好出现 10 次；未访问 val/test；P2、manifest 和 ID 清单未修改
+- 模型/权重：base `/home/dqwang/Model/InternVL3-2B`，revision `899155015275a9b7338c7f4677e19c784e0e5a21`；Sa2VA HF revision `15837dcaecc304714a1f0f069e74f47e47521c7f`；full PTH `/home/dqwang/Model/Sa2VA-InternVL3-2B-train/sa2va_full_bf16.pth`，SHA-256 `5aa030f3203487281abcb57d7dbed72bba618b9f08859e1c020085454b2822e6`
+- 实际配置：seed `20260916`；10 epoch/320 optimizer steps；batch=1、accumulation=1、BF16；AdamW lr `4e-5`、betas `(0.9,0.999)`、weight decay `0.05`；16-step linear warmup + cosine；沿用预注册 protocol 的 optimizer，不做超参数搜索
+- 冻结边界：只有 `text_hidden_fcs.{0.weight,0.bias,2.weight,2.bias}` 可训练，共 2,754,304 parameters；LLM、vision、InternVL `mlp1`、SAM2 全冻结；labels-aware + strict one-to-one，未调用 legacy `fix_number=5`
+- 训练命令：`CUDA_VISIBLE_DEVICES=0 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 MPLCONFIGDIR=/tmp/chartground_mpl projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/run_phase4c_train.py --config projects/chartground_edit/configs/phase4c_overfit32.py --base-model /home/dqwang/Model/InternVL3-2B --full-pth /home/dqwang/Model/Sa2VA-InternVL3-2B-train/sa2va_full_bf16.pth --full-pth-sha256 5aa030f3203487281abcb57d7dbed72bba618b9f08859e1c020085454b2822e6 --output-dir /tmp/chartground_edit_phase4c_overfit32 --base-repo-id OpenGVLab/InternVL3-2B --base-revision 899155015275a9b7338c7f4677e19c784e0e5a21 --sa2va-hf-revision 15837dcaecc304714a1f0f069e74f47e47521c7f`
+- loss：step1→step320 为 language `0.252669→0.306876`、mask CE `2.234216→0.083364`、Dice `0.468146→0.137567`、total `2.955030→0.527808`；最低值依次为 `0.243167/0.017682/0.008934/0.286114`；第一→最后 epoch 均值的 mask CE `0.950996→0.294163`、Dice `0.359105→0.191986`
+- gradient/runtime：320/320 steps finite；每步 4/4 trainable tensor 非零 gradient，冻结参数 gradient 0；模型构建 39.912 s，训练循环 112.999 s；peak allocated/reserved `7,336.494/9,714.0 MiB`
+- checkpoint：`step_32.pth` 11,020,912 bytes、`step_128.pth` 和 `step_320.pth` 各 11,020,920 bytes；每份严格只含四个 FP32 projection tensor 和身份/对齐/step metadata
+- 推理命令：`CUDA_VISIBLE_DEVICES=0 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/run_phase4c_inference.py --checkpoint /home/dqwang/Model/Sa2VA-InternVL3-2B --manifest projects/chartground_edit/data/synthetic_v1/annotations.jsonl --selection projects/chartground_edit/configs/phase4_overfit32_ids.json --output-dir /tmp/chartground_edit_phase4c_eval --projection step32=/tmp/chartground_edit_phase4c_overfit32/step_32.pth --projection step128=/tmp/chartground_edit_phase4c_overfit32/step_128.pth --projection step320=/tmp/chartground_edit_phase4c_overfit32/step_320.pth`（其余四个 identity 参数与训练相同）
+- 推理结果：baseline/step32/step128/step320 的 16-group Macro IoU 为 `0.164664/0.359869/0.509776/0.569468`，Macro Dice 为 `0.189729/0.447115/0.605529/0.674806`，Micro IoU 为 `0.126421/0.387907/0.579544/0.657489`，empty rate 为 `43.75%/3.125%/0%/0%`，nonempty-disjoint rate 为 `21.875%/3.125%/3.125%/0%`；训练后 baseline 与训练前逐 mask hash 完全一致
+- 分组：step320 相对 baseline 的 16/16 组合 mean IoU 均提升，范围 `+0.003507` 到 `+0.936499`；best 为 step320，Macro IoU 增益 `+0.404804`
+- OOM/重试：训练无 OOM、无重试。首次训练后推理启动在受限进程中于模型加载前因 CUDA 不可见退出，未创建输出、未运行样本；随后在 GPU 可见环境完成唯一正式 128-call 顺序评测，不涉及额外训练
+- 验证：Phase 4A/B/C 专项 44/44、ChartGround-Edit 限定全量 185/185 通过；compileall、配置解析、`git diff --check` 通过；三份 projection checkpoint 经正式 loader 转为 BF16 后逐 tensor 精确一致；320 条训练记录与 128 条 train-only 推理记录独立计数通过
+- GPU 释放：训练与推理进程退出后物理 GPU 0 为 2 MiB used、24,252 MiB free、0% utilization
+- 产物：完整日志/checkpoint/mask 在 `/tmp/chartground_edit_phase4c_overfit32`、`/tmp/chartground_edit_phase4c_eval`；仓库保留 `results/phase4c_overfit32_{metrics.jsonl,summary.json}`、`assets/phase4c_overfit32_gallery.png` 和结果文档
+- 结论：strategy A 在固定 overfit32 上达到预注册“明显成功”标准，证明 projection-only 具有小样本学习/记忆能力；不是泛化结论，未自动转 LoRA/SAM2，未开始完整 train
+
 ## 2026-09-17 Phase 4B-1 单样本单步训练 smoke
 
 - 日期：2026-09-17

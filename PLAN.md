@@ -210,6 +210,21 @@ finite，4/4 projection tensors 获得非零梯度，冻结参数无梯度，ste
 `iter_1.pth` 仅含四个目标 tensor，并已通过清零后正式 loader 的逐 tensor 精确重载。
 Phase 4B-1 门禁通过；本轮未运行 32 样本、val/test 或完整 HF 导出。
 
+### Phase 4C 实际状态（2026-09-17）
+
+固定 synthetic_v1 train-only overfit32、P2 和 seed `20260916`，只训练四个
+`text_hidden_fcs.*` tensor（2,754,304 parameters），完成 10 epoch、320 optimizer
+steps；每条样本恰好出现 10 次。沿用预注册协议的 AdamW `lr=4e-5`、weight decay
+`0.05`、5% linear warmup + cosine，其余模块全部冻结。训练无 OOM、无重试，三份
+projection-only checkpoint 位于 `/tmp/chartground_edit_phase4c_overfit32`。
+
+生产推理路径在同一次 HF 模型加载中依次评测 baseline、step32、step128、step320；
+baseline 与训练前逐 mask 哈希完全一致。16-group Macro IoU 从 `0.164664` 提升至
+`0.359869 / 0.509776 / 0.569468`，step320 相对 baseline `+0.404804`，达到预注册的
+明显成功阈值；empty rate 从 `43.75%` 降到 `0%`，16/16 组合均提升。该结论仅证明
+固定 32 条训练样本上的 projection-only learnability，不代表泛化能力。进入完整 train
+前仍需单独批准训练预算；本阶段没有访问 val/test，也没有自动切换 LoRA 或 SAM2。
+
 ### 目标
 
 以最小可训练参数验证模型能学习 ChartGround-Edit 的指代分割。

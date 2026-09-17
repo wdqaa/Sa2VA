@@ -10,6 +10,11 @@ from typing import Any
 from PIL import Image
 
 from .mask_processing import MaskProcessingError, process_prediction_masks
+from .projection_checkpoint import (
+    load_projection_checkpoint_into_model,
+    projection_state,
+    restore_projection_state,
+)
 from .prompt_variants import FULL_INSTRUCTION, PROMPT_TEMPLATES, build_prompt_variant
 from .types import PredictionResult
 
@@ -52,6 +57,8 @@ class Sa2VAInternVL3Backend:
         dtype: str = "bfloat16",
         model_name: str = MODEL_NAME,
         min_free_gpu_memory_mb: float = MIN_FREE_GPU_MEMORY_MB,
+        projection_checkpoint: str | Path | None = None,
+        projection_identity: dict[str, str] | None = None,
     ) -> None:
         checkpoint = Path(checkpoint_path)
         if not checkpoint.is_dir():
@@ -70,6 +77,21 @@ class Sa2VAInternVL3Backend:
         self._model: Any = None
         self._tokenizer: Any = None
         self._loaded = False
+        self.projection_checkpoint = (
+            Path(projection_checkpoint) if projection_checkpoint is not None else None
+        )
+        self.projection_identity = projection_identity
+        if self.projection_checkpoint is not None:
+            if not self.projection_checkpoint.is_file():
+                raise ValueError(
+                    f"projection checkpoint does not exist: {self.projection_checkpoint}"
+                )
+            if projection_identity is None:
+                raise ValueError(
+                    "projection_identity is required with projection_checkpoint"
+                )
+        self._base_projection_state: dict[str, Any] | None = None
+        self.active_projection_checkpoint: str | None = None
         self.model_load_attempts = 0
         self.model_load_time_ms: float | None = None
         self.pre_load_free_gpu_memory_mb: float | None = None
@@ -111,6 +133,27 @@ class Sa2VAInternVL3Backend:
             instruction=instruction,
             parameters=parameters,
         )
+
+    def set_projection_checkpoint(self, checkpoint_path: str | Path | None) -> None:
+        """Restore the HF projection or strictly load one projection checkpoint."""
+        self.load()
+        if self._base_projection_state is None:
+            raise RuntimeError("base projection snapshot is unavailable")
+        if checkpoint_path is None:
+            restore_projection_state(self._model, self._base_projection_state)
+            self.active_projection_checkpoint = None
+            return
+        if self.projection_identity is None:
+            raise ValueError("projection_identity is required to load a checkpoint")
+        path = Path(checkpoint_path)
+        if not path.is_file():
+            raise ValueError(f"projection checkpoint does not exist: {path}")
+        load_projection_checkpoint_into_model(
+            self._model,
+            path,
+            expected_identity=self.projection_identity,
+        )
+        self.active_projection_checkpoint = str(path)
 
     def predict_prompt(
         self,
@@ -288,6 +331,15 @@ class Sa2VAInternVL3Backend:
         model.to(self.device)
         self._tokenizer = tokenizer
         self._model = model
+        if self.projection_identity is not None or self.projection_checkpoint is not None:
+            self._base_projection_state = projection_state(model)
+        if self.projection_checkpoint is not None:
+            load_projection_checkpoint_into_model(
+                model,
+                self.projection_checkpoint,
+                expected_identity=self.projection_identity or {},
+            )
+            self.active_projection_checkpoint = str(self.projection_checkpoint)
 
     def _prepare_cuda_for_load(self) -> None:
         torch = self._import_torch()
@@ -332,6 +384,8 @@ class Sa2VAInternVL3Backend:
         self._model = None
         self._tokenizer = None
         self._loaded = False
+        self._base_projection_state = None
+        self.active_projection_checkpoint = None
         gc.collect()
         try:
             self._import_torch().cuda.empty_cache()
