@@ -236,6 +236,18 @@ Primary 选择 step960，相对 baseline `0.182199` 提升 `+0.243843`；empty r
 43.75% 降到 0%。本阶段未访问 test，具备另行批准 Phase 5B 单次 fine-tuned test 的
 工程条件。
 
+### Phase 5B 实际状态（2026-09-17）
+
+已将 Phase 5A 唯一选中的 step960 projection 持久化并以 SHA-256
+`64c0d109d2985893ba1f2ba4c4fe7acc4265dc758e5d56ecb6ac8e2aa791f41e`
+冻结。随后只加载一次正式 HF 模型，对 synthetic_v1 test 64 条各执行一次 P2 推理；
+未重新运行 zero-shot、未比较其他 checkpoint、未训练或重试。Fine-tuned 16-group
+Macro IoU/Dice 为 `0.428948/0.534238`，相对 Phase 3C 保存的 zero-shot
+`0.198033/0.242366` 提升 `+0.230916/+0.291872`；empty rate 从 `42.1875%`
+降至 `0%`。15/16 组合提升、1 组持平、0 组下降。64 个预测 mask 均通过原尺寸、
+二值和离线指标复算，64/64 predicted-mask 编辑成功。最终无 GT CLI 复用冻结 P2、
+strict projection loader 和既有 editor；本阶段没有根据 test 修改模型。
+
 ### 目标
 
 以最小可训练参数验证模型能学习 ChartGround-Edit 的指代分割。

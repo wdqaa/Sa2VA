@@ -1,5 +1,23 @@
 # ChartGround-Edit 实验记录
 
+## 2026-09-17 Phase 5B frozen step960 fine-tuned test
+
+- 实验 ID：`phase5b-step960-one-shot-finetuned-test`；基线 commit `2369a00`，开始时 clean，Phase 5A 已提交
+- checkpoint：Phase 5A `step960` 持久化至仓库外约定目录 `ChartGround-Edit/chartground_projection_step960.pth`；源/目标 SHA-256 均为 `64c0d109d2985893ba1f2ba4c4fe7acc4265dc758e5d56ecb6ac8e2aa791f41e`，只含四个 `text_hidden_fcs.*` FP32 tensor，2,754,304 parameters，step=960
+- 身份：Sa2VA HF revision `15837dcaecc304714a1f0f069e74f47e47521c7f`；base `OpenGVLab/InternVL3-2B@899155015275a9b7338c7f4677e19c784e0e5a21`；full PTH SHA-256 `5aa030f3203487281abcb57d7dbed72bba618b9f08859e1c020085454b2822e6`；P2 registry/template SHA-256 `dc822a33b84b1cdfb72f84bd5288f0ebb37626980496107c5e30d4c4c26217c0` / `37a785d086a80fef21fd69014670b3892acad5c379722cb79658fb837a923806`
+- 冻结协议：`phase5b_finetuned_test_protocol.md` 在推理前后 SHA-256 均为 `addc039c06cf063633cf03f7ced63621c8ce8b3a1fc8e4aa010e17c1ced2f52e`；manifest/test-ID hashes 与 Phase 3C 一致
+- 运行：物理 GPU 0、BF16、P2、persistent step960；模型加载 1 次，64 条 test 各调用一次，共 64/64；未运行 baseline、其他 projection、val/train 或任何重试
+- 完整性：execution/mask contract/`[SEG]` 均 64/64；64 个保存 mask 均为原图尺寸二值 mask，64 条 IoU/Dice 经独立离线复算无误；异常和空预测计入分母（本次均为 0）
+- 指标：16-group Macro IoU/Dice `0.428948/0.534238`；sample Macro IoU/Dice `0.428948/0.534238`；Micro IoU/Dice `0.397803/0.569183`；median IoU/Dice `0.378353/0.548924`
+- 相对 Phase 3C 保存的 zero-shot：Macro IoU/Dice `+0.230916/+0.291872`，Micro IoU/Dice `+0.172502/+0.201435`；empty rate `42.1875%→0%`，overlap `46.875%→90.625%`，nonempty-disjoint `10.9375%→9.375%`；baseline 只读 JSON，未重跑模型
+- 分组：15 个组合提升、0 个下降、1 个持平；最大提升 `line/appearance +0.396911`；最强 `bar/legend=0.967094`；最弱且持平 `bar/appearance=0`
+- 编辑闭环：64 个非空预测全部使用 predicted mask 执行原样本 action/parameters，64/64 成功；0 个空预测跳过；编辑成功不代表分割正确
+- bootstrap：16-group Macro IoU 95% CI `[0.320991,0.555574]`，Macro Dice `[0.425557,0.647002]`；seed `20260916`、10,000 次，仅描述 test 不确定性
+- 性能：模型加载 `8022.795 ms`；mean/median predict latency `604.748/572.532 ms`；PyTorch peak allocated `5010.554 MiB`；正式进程约 55.0 秒；无 OOM
+- 产物：完整 mask/编辑图/日志在 `/tmp/chartground_edit_phase5b_finetuned_test`；版本化 metrics/summary/report/gallery 使用 `phase5b_finetuned_test_*`；无 GT CLI 为 `scripts/run_chartground_edit.py`
+- 验证：Phase 5B/相关专项 30/30、最终 ChartGround-Edit 全量 197/197 通过；compileall、协议前后 hash、64 条独立复算和 `git diff --check` 通过；正式进程退出后物理 GPU 0 为 2 MiB used、0% utilization，显存已释放
+- 结论：strategy A 在一次性独立 test 上保持明显正向提升，证明 projection-only 对 synthetic_v1 具备泛化增益；这仍是合成数据结果，不能外推到真实科学图表。未重新训练、未更换 checkpoint、未重跑 zero-shot/fine-tuned test
+
 ## 2026-09-17 Phase 5A full train / val selection
 
 - 实验 ID：`phase5a-full-train-strategy-a-val-selection`；基线 commit `5d042ff`，开始时 clean

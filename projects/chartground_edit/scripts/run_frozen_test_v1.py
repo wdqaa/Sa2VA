@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the one-shot frozen P2 baseline on balanced synthetic_v1 test."""
+"""Run a one-shot frozen P2 evaluation on balanced synthetic_v1 test."""
 
 from __future__ import annotations
 
@@ -51,6 +51,13 @@ from chartground_edit.inference.prompt_benchmark_v1 import (
     sha256_file,
 )
 from chartground_edit.inference.prompt_variants import TARGET_ONLY_ZH
+from chartground_edit.inference.phase5b import (
+    SELECTED_PROJECTION_SHA256,
+    compare_with_saved_zero_shot,
+    projection_identity,
+    validate_one_shot_records,
+    validate_selected_projection,
+)
 from chartground_edit.visualization.render import mask_overlay
 
 
@@ -79,6 +86,12 @@ DEFAULT_GALLERY = Path(
 DEFAULT_REPORT = Path("projects/chartground_edit/docs/phase3c_frozen_test_results.md")
 DEFAULT_VAL_SUMMARY = Path(
     "projects/chartground_edit/results/phase3b_balanced_val_summary.json"
+)
+DEFAULT_ZERO_SHOT_SUMMARY = Path(
+    "projects/chartground_edit/results/phase3c_frozen_test_summary.json"
+)
+DEFAULT_ZERO_SHOT_METRICS = Path(
+    "projects/chartground_edit/results/phase3c_frozen_test_metrics.jsonl"
 )
 
 
@@ -130,7 +143,11 @@ def logical_cuda_zero(value: str) -> str:
 
 def parse_args(arguments: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--experiment", choices=("phase3c", "phase5b"), default="phase3c"
+    )
     parser.add_argument("--checkpoint", required=True, type=existing_directory)
+    parser.add_argument("--projection-checkpoint", type=existing_file)
     parser.add_argument("--manifest", required=True, type=existing_file)
     parser.add_argument("--split", required=True, type=test_only_split)
     parser.add_argument("--prompt-variant", required=True, type=p2_only_variant)
@@ -145,6 +162,9 @@ def parse_args(arguments: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--gallery-output", type=Path, default=DEFAULT_GALLERY)
     parser.add_argument("--report-output", type=Path, default=DEFAULT_REPORT)
     parser.add_argument("--validation-summary", type=Path, default=DEFAULT_VAL_SUMMARY)
+    parser.add_argument("--zero-shot-summary", type=Path, default=DEFAULT_ZERO_SHOT_SUMMARY)
+    parser.add_argument("--zero-shot-metrics", type=Path, default=DEFAULT_ZERO_SHOT_METRICS)
+    parser.add_argument("--protocol-sha256")
     return parser.parse_args(arguments)
 
 
@@ -181,10 +201,14 @@ def main(arguments: list[str] | None = None) -> int:
     ]:
         raise RuntimeError("test Reader order differs from validated manifest order")
 
+    backend_kwargs: dict[str, Any] = {}
+    if args.experiment == "phase5b":
+        backend_kwargs = {
+            "projection_checkpoint": args.projection_checkpoint,
+            "projection_identity": projection_identity(),
+        }
     backend = Sa2VAInternVL3Backend(
-        args.checkpoint,
-        device=args.device,
-        dtype=args.dtype,
+        args.checkpoint, device=args.device, dtype=args.dtype, **backend_kwargs
     )
     results: list[dict[str, Any]] = []
     backend_call_count = 0
@@ -241,11 +265,14 @@ def main(arguments: list[str] | None = None) -> int:
                 preflight=preflight,
                 dtype=args.dtype,
                 device=args.device,
+                projection_checkpoint=args.projection_checkpoint,
             )
             results.append(row)
             partial.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
     validate_frozen_test_results(results, expected_samples=args.expected_samples)
+    if args.experiment == "phase5b":
+        validate_one_shot_records(results)
     if backend_call_count != EXPECTED_TEST_ATTEMPTS:
         raise RuntimeError(
             f"expected {EXPECTED_TEST_ATTEMPTS} backend calls, got {backend_call_count}"
@@ -277,7 +304,13 @@ def main(arguments: list[str] | None = None) -> int:
         protocol_sha256=preflight["protocol_sha256_start"],
         prompt_hashes=preflight["prompt_template_hashes"],
     )
-    validation_comparison = _validation_comparison(aggregate, args.validation_summary)
+    comparison_key: str
+    if args.experiment == "phase5b":
+        comparison_key = "zero_shot_comparison"
+        comparison = compare_with_saved_zero_shot(aggregate, args.zero_shot_summary)
+    else:
+        comparison_key = "validation_comparison"
+        comparison = _validation_comparison(aggregate, args.validation_summary)
     finished_at = datetime.now(timezone.utc).isoformat()
     common = {
         **preflight,
@@ -302,7 +335,7 @@ def main(arguments: list[str] | None = None) -> int:
             default=None,
         ),
         "verification": verification,
-        "validation_comparison": validation_comparison,
+        comparison_key: comparison,
     }
     summary = {**common, **aggregate}
     results_path = args.output_dir / "results.jsonl"
@@ -319,15 +352,32 @@ def main(arguments: list[str] | None = None) -> int:
 
     if verification["passed"]:
         args.repository_results_dir.mkdir(parents=True, exist_ok=True)
+        stem = (
+            "phase5b_finetuned_test"
+            if args.experiment == "phase5b"
+            else "phase3c_frozen_test"
+        )
         _write_jsonl(
-            args.repository_results_dir / "phase3c_frozen_test_metrics.jsonl",
+            args.repository_results_dir / f"{stem}_metrics.jsonl",
             results,
         )
-        _write_json(
-            args.repository_results_dir / "phase3c_frozen_test_summary.json", summary
+        _write_json(args.repository_results_dir / f"{stem}_summary.json", summary)
+        zero_shot_rows = (
+            _read_jsonl(args.zero_shot_metrics)
+            if args.experiment == "phase5b"
+            else None
         )
-        _render_gallery(samples, results, annotations, args.gallery_output)
-        _write_report(summary, args.report_output)
+        _render_gallery(
+            samples,
+            results,
+            annotations,
+            args.gallery_output,
+            zero_shot_rows=zero_shot_rows,
+        )
+        if args.experiment == "phase5b":
+            _write_phase5b_report(summary, args.report_output)
+        else:
+            _write_report(summary, args.report_output)
 
     load_attempts = backend.model_load_attempts
     del backend
@@ -374,16 +424,34 @@ def _preflight(args: argparse.Namespace) -> dict[str, Any]:
         )
     if not args.protocol.is_file():
         raise ValueError(f"protocol file does not exist: {args.protocol}")
-    if not args.validation_summary.is_file():
+    if args.experiment == "phase3c" and not args.validation_summary.is_file():
         raise ValueError(
             f"Phase 3B validation summary does not exist: {args.validation_summary}"
         )
+    projection_audit: dict[str, Any] | None = None
+    if args.experiment == "phase5b":
+        if args.projection_checkpoint is None:
+            raise ValueError("Phase 5B requires --projection-checkpoint")
+        if not args.zero_shot_summary.is_file() or not args.zero_shot_metrics.is_file():
+            raise ValueError("saved Phase 3C summary and metrics are required")
+        if not args.protocol_sha256:
+            raise ValueError("Phase 5B requires --protocol-sha256")
+        projection_audit = validate_selected_projection(args.projection_checkpoint)
+    elif args.projection_checkpoint is not None:
+        raise ValueError("Phase 3C does not accept a projection checkpoint")
     manifest_sha256 = sha256_file(args.manifest)
     if manifest_sha256 != EXPECTED_MANIFEST_SHA256:
         raise ValueError("manifest SHA-256 differs from frozen identity")
     protocol_sha256 = sha256_file(args.protocol)
-    if protocol_sha256 != EXPECTED_PROTOCOL_SHA256:
-        raise ValueError("Phase 3C protocol SHA-256 differs from frozen identity")
+    expected_protocol_sha256 = (
+        args.protocol_sha256
+        if args.experiment == "phase5b"
+        else EXPECTED_PROTOCOL_SHA256
+    )
+    if protocol_sha256 != expected_protocol_sha256:
+        raise ValueError(
+            f"{args.experiment} protocol SHA-256 differs from frozen identity"
+        )
     prompt_hashes = prompt_template_hashes()
     if prompt_hashes["registry_sha256"] != EXPECTED_PROMPT_REGISTRY_SHA256:
         raise ValueError("Prompt registry SHA-256 differs from frozen identity")
@@ -409,6 +477,7 @@ def _preflight(args: argparse.Namespace) -> dict[str, Any]:
             f"checkpoint revision mismatch: {revision!r} != {CHECKPOINT_REVISION!r}"
         )
     return {
+        "experiment": args.experiment,
         "model_name": MODEL_NAME,
         "checkpoint_path": str(args.checkpoint),
         "checkpoint_revision": revision,
@@ -426,6 +495,7 @@ def _preflight(args: argparse.Namespace) -> dict[str, Any]:
         "code_commit": _git_commit(),
         "code_worktree_dirty_at_start": _git_dirty(),
         "gpu_name": _gpu_name(args.device),
+        "projection_checkpoint": projection_audit,
     }
 
 
@@ -441,6 +511,7 @@ def _save_attempt(
     preflight: dict[str, Any],
     dtype: str,
     device: str,
+    projection_checkpoint: Path | None,
 ) -> dict[str, Any]:
     annotation = sample.annotation
     sample_dir = output_dir / "samples" / annotation["sample_id"]
@@ -566,6 +637,12 @@ def _save_attempt(
         "model_name": MODEL_NAME,
         "checkpoint_path": str(checkpoint),
         "checkpoint_revision": preflight["checkpoint_revision"],
+        "projection_checkpoint_path": (
+            str(projection_checkpoint) if projection_checkpoint is not None else None
+        ),
+        "projection_checkpoint_sha256": (
+            SELECTED_PROJECTION_SHA256 if projection_checkpoint is not None else None
+        ),
         "manifest_sha256": preflight["manifest_sha256"],
         "test_sample_id_list_sha256": preflight["test_sample_id_list_sha256"],
         "protocol_sha256": preflight["protocol_sha256_start"],
@@ -752,10 +829,19 @@ def _render_gallery(
     results: list[dict[str, Any]],
     annotations: list[dict[str, Any]],
     output_path: Path,
+    *,
+    zero_shot_rows: list[dict[str, Any]] | None = None,
 ) -> None:
     selected_ids = select_frozen_test_gallery_sample_ids(annotations)
     sample_lookup = {sample.annotation["sample_id"]: sample for sample in samples}
     result_lookup = {row["sample_id"]: row for row in results}
+    zero_shot_lookup = (
+        {row["sample_id"]: row for row in zero_shot_rows}
+        if zero_shot_rows is not None
+        else {}
+    )
+    if zero_shot_rows is not None and set(zero_shot_lookup) != set(result_lookup):
+        raise ValueError("saved zero-shot metrics sample IDs differ from Phase 5B")
     panel_size = (240, 160)
     header_height = 48
     footer_height = 34
@@ -784,13 +870,19 @@ def _render_gallery(
             fill="black",
             font=font,
         )
-        draw.text(
-            (7, 22),
-            f"P2 IoU={result['iou']:.4f} Dice={result['dice']:.4f} | "
-            f"empty={result['empty_prediction']} disjoint={result['nonempty_disjoint']}",
-            fill="black",
-            font=font,
-        )
+        if zero_shot_rows is None:
+            metric_text = (
+                f"P2 IoU={result['iou']:.4f} Dice={result['dice']:.4f} | "
+                f"empty={result['empty_prediction']} disjoint={result['nonempty_disjoint']}"
+            )
+            prediction_label = "P2 prediction overlay"
+        else:
+            metric_text = (
+                f"zero-shot IoU={zero_shot_lookup[sample_id]['iou']:.4f} | "
+                f"fine-tuned IoU={result['iou']:.4f} Dice={result['dice']:.4f}"
+            )
+            prediction_label = "fine-tuned prediction"
+        draw.text((7, 22), metric_text, fill="black", font=font)
         with Image.open(result["output_files"]["predicted_mask"]) as source:
             predicted = source.convert("L").copy()
         if result["edit_execution_success"] is True:
@@ -807,7 +899,7 @@ def _render_gallery(
         panels = [
             ("original", sample.image.convert("RGB")),
             ("GT overlay", mask_overlay(sample.image, sample.mask)),
-            ("P2 prediction overlay", mask_overlay(sample.image, predicted)),
+            (prediction_label, mask_overlay(sample.image, predicted)),
             (edit_label, edited),
         ]
         for column, (label, image) in enumerate(panels):
@@ -1019,6 +1111,95 @@ def _write_report(summary: dict[str, Any], output_path: Path) -> None:
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _write_phase5b_report(summary: dict[str, Any], output_path: Path) -> None:
+    metric = summary["metrics"]
+    comparison = summary["zero_shot_comparison"]
+    bootstrap = metric["bootstrap_16_group_macro"]
+    lines = [
+        "# Phase 5B fine-tuned test results",
+        "",
+        "唯一一次正式推理覆盖 `synthetic_v1` test 64 条；使用冻结的 P2 和 "
+        "Phase 5A `step960` projection。Zero-shot 数值直接读取 Phase 3C 保存结果，"
+        "未重新运行 baseline。",
+        "",
+        "| metric | fine-tuned | zero-shot | delta |",
+        "|---|---:|---:|---:|",
+    ]
+    for name, label in (
+        ("group_macro_iou", "16-group Macro IoU"),
+        ("group_macro_dice", "16-group Macro Dice"),
+        ("micro_iou", "Micro IoU"),
+        ("micro_dice", "Micro Dice"),
+        ("empty_prediction_rate", "Empty rate"),
+        ("overlapping_prediction_rate", "Overlap rate"),
+        ("nonempty_disjoint_rate", "Nonempty-disjoint rate"),
+    ):
+        row = comparison["overall"][name]
+        lines.append(
+            f"| {label} | {row['fine_tuned']:.6f} | {row['zero_shot']:.6f} | "
+            f"{row['delta']:+.6f} |"
+        )
+    lines.extend(
+        [
+            "",
+            f"Sample Macro IoU/Dice: `{metric['sample_macro_iou']:.6f}` / "
+            f"`{metric['sample_macro_dice']:.6f}`; median IoU/Dice: "
+            f"`{metric['median_iou']:.6f}` / `{metric['median_dice']:.6f}`.",
+            "",
+            f"Bootstrap 16-group Macro IoU 95% CI: "
+            f"`[{bootstrap['iou']['ci95_lower']:.6f}, "
+            f"{bootstrap['iou']['ci95_upper']:.6f}]`; Dice 95% CI: "
+            f"`[{bootstrap['dice']['ci95_lower']:.6f}, "
+            f"{bootstrap['dice']['ci95_upper']:.6f}]`.",
+            "",
+            "## 16 chart/referring groups",
+            "",
+            "| group | zero-shot IoU | fine-tuned IoU | delta | fine-tuned Dice |",
+            "|---|---:|---:|---:|---:|",
+        ]
+    )
+    for name, row in comparison["groups"].items():
+        lines.append(
+            f"| {name} | {row['zero_shot_iou']:.6f} | "
+            f"{row['fine_tuned_iou']:.6f} | {row['delta_iou']:+.6f} | "
+            f"{row['fine_tuned_dice']:.6f} |"
+        )
+    lines.extend(
+        [
+            "",
+            f"提升/下降/持平组数：{comparison['improved_group_count']} / "
+            f"{comparison['declined_group_count']} / {comparison['tied_group_count']}。",
+            f"最大提升：`{comparison['max_gain_group']}` "
+            f"({comparison['max_gain_iou']:+.6f})；最大下降："
+            f"`{comparison['max_loss_group']}` ({comparison['max_loss_iou']:+.6f})。",
+            f"最强组：`{comparison['strongest_group']}` "
+            f"({comparison['strongest_group_iou']:.6f})；最弱组："
+            f"`{comparison['weakest_group']}` ({comparison['weakest_group_iou']:.6f})。",
+            "",
+            "## Execution and editing",
+            "",
+            f"- Execution success: {metric['execution_success_count']}/64; mask contract: "
+            f"{metric['mask_contract_valid_count']}/64; `[SEG]`: "
+            f"{metric['segmentation_token_count']}/64.",
+            f"- Nonempty/empty: {metric['nonempty_prediction_count']} / "
+            f"{metric['empty_prediction_count']}; overlap/nonempty-disjoint: "
+            f"{metric['overlapping_prediction_count']} / "
+            f"{metric['nonempty_disjoint_count']}.",
+            f"- Predicted-mask edits attempted/succeeded: {metric['edit_attempt_count']} / "
+            f"{metric['edit_execution_success_count']}; empty predictions skipped: "
+            f"{metric['edit_skipped_empty_count']}.",
+            f"- Mean/median latency: {metric['mean_latency_ms']:.3f} / "
+            f"{metric['median_latency_ms']:.3f} ms.",
+            "- 编辑只使用预测 mask；编辑成功不代表分割正确。",
+            "",
+            "完整标量与分组结果见对应 JSON/JSONL；gallery 每组按 sample ID "
+            "确定性选择一条，未按效果筛选。",
+        ]
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _detect_local_revision(checkpoint: Path) -> str | None:
     metadata_dir = checkpoint / ".cache/huggingface/download"
     revisions: set[str] = set()
@@ -1069,6 +1250,14 @@ def _write_jsonl(path: Path, values: list[dict[str, Any]]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for value in values:
             handle.write(json.dumps(value, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
 
 if __name__ == "__main__":

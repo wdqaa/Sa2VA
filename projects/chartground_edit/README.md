@@ -2,11 +2,11 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：Phase 1–3C、Phase 4A–4C 和 Phase 5A 已完成。P2 `target_only_zh` 保持
-冻结；真实 Sa2VA-InternVL3-2B 仅训练 `text_hidden_fcs`，在完整 192 条 train 上完成
-1920 steps。固定 64 条 val 按预注册规则选择 step960：16-group Macro IoU 从
-zero-shot `0.182199` 提升至 `0.426042`，empty rate 从 `43.75%` 降至 `0%`。本阶段
-没有访问 test；最终 fine-tuned test 尚未运行。
+当前状态：Phase 1–5B 已完成。P2 `target_only_zh` 保持冻结；真实
+Sa2VA-InternVL3-2B 仅训练 `text_hidden_fcs`。固定 val 选择 step960 后，在唯一一次
+64 条 fine-tuned test 中，16-group Macro IoU/Dice 达到 `0.428948/0.534238`，相对
+保存的 zero-shot test 提升 `+0.230916/+0.291872`，empty rate 从 `42.1875%` 降至
+`0%`。没有根据 test 重训、换 checkpoint 或调整 Prompt。
 
 ## MVP
 
@@ -382,6 +382,44 @@ Macro IoU 为 `0.182199 / 0.265243 / 0.385975 / 0.426042 / 0.417203 / 0.406564`�
 [`docs/phase5a_full_train_results.md`](docs/phase5a_full_train_results.md)。
 
 ![Phase 5A val gallery](assets/phase5a_full_train_val_gallery.png)
+
+## Phase 5B：一次性 fine-tuned test 与无 GT Demo
+
+固定 step960 后只运行一次 64 条 synthetic_v1 test。模型加载一次、每条调用一次；
+execution、mask contract 和 `[SEG]` 均为 64/64。对比数值直接读取 Phase 3C 保存结果，
+没有重跑 zero-shot。
+
+| stage | split/scope | checkpoint | Macro IoU | Macro Dice | empty rate |
+|---|---|---|---:|---:|---:|
+| zero-shot | test 64 | HF baseline | 0.198033 | 0.242366 | 42.1875% |
+| overfit32 | train 32 | step320 | 0.569468 | 0.674806 | 0% |
+| full train | val 64 | step960 | 0.426042 | 0.532503 | 0% |
+| fine-tuned | test 64 | frozen step960 | 0.428948 | 0.534238 | 0% |
+
+overfit32 只表示训练集记忆能力；val 用于一次 checkpoint 选择；fine-tuned test 只用于
+最终一次性报告。完整结果见
+[`docs/phase5b_finetuned_test_results.md`](docs/phase5b_finetuned_test_results.md)。
+
+![Phase 5B fine-tuned test gallery](assets/phase5b_finetuned_test_gallery.png)
+
+持久 checkpoint 放在版本库外，运行时通过 CLI 传入：
+
+```bash
+CUDA_VISIBLE_DEVICES=<FREE_GPU> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+projects/sa2va/.venv/bin/python \
+  projects/chartground_edit/scripts/run_chartground_edit.py \
+  --checkpoint /path/to/Sa2VA-InternVL3-2B \
+  --projection-checkpoint /path/to/chartground_projection_step960.pth \
+  --image /path/to/chart.png \
+  --referring-expression "图中上升最快的折线" \
+  --action recolor --color "#E63946" \
+  --output-dir /tmp/chartground_edit_demo \
+  --device cuda:0 --dtype bfloat16
+```
+
+该入口不接收 GT mask，输出 `predicted_mask.png`、`overlay.png`、非空预测对应的
+`edited.png` 和 `result.json`。当前主要局限是训练与最终统计均来自合成数据；
+`bar/appearance` test 组仍为 0 IoU，且 projection-only 尚未在真实出版图表上验证。
 
 ## 开发路线
 
