@@ -92,7 +92,8 @@ class Sa2VAModel(BaseModel):
 
         if pretrained_pth is not None:
             pretrained_state_dict = guess_load_checkpoint(pretrained_pth)
-            self.load_state_dict(pretrained_state_dict, strict=False)
+            self.pretrained_load_incompatible_keys = self.load_state_dict(
+                pretrained_state_dict, strict=False)
             print(f'Load pretrained weight from {pretrained_pth}')
 
             # FIX: Force update lm_head weight after loading state_dict

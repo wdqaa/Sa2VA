@@ -1,5 +1,25 @@
 # ChartGround-Edit 实验记录
 
+## 2026-09-17 Phase 4B-1 单样本单步训练 smoke
+
+- 日期：2026-09-17
+- 实验 ID：`phase4b1-sa2va-internvl3-2b-one-step`
+- Git commit：基线 `68eea6c`（Phase 4B-0 已提交）；开始时工作区 clean
+- 数据：仅 synthetic_v1 train smoke1 `cgev1_bar_category_6d51bac154`；未访问 val/test，P2、manifest 和 smoke1 ID 未修改
+- base：`OpenGVLab/InternVL3-2B` revision `899155015275a9b7338c7f4677e19c784e0e5a21`，本地 `/home/dqwang/Model/InternVL3-2B`
+- Sa2VA 输入：HF revision `15837dcaecc304714a1f0f069e74f47e47521c7f`；官方 `tools/convert_to_pth.py` 产出 `/home/dqwang/Model/Sa2VA-InternVL3-2B-train/sa2va_full_bf16.pth`，4,632,880,109 bytes，SHA-256 `5aa030f3203487281abcb57d7dbed72bba618b9f08859e1c020085454b2822e6`；1,589 个 tensor、2,316,157,490 parameters，全部 BF16，前缀 `mllm/text_hidden_fcs/grounding_encoder=685/4/900`
+- 运行命令：`CUDA_VISIBLE_DEVICES=5 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 MPLCONFIGDIR=/tmp/chartground_mpl projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/run_phase4b_smoke1.py --config projects/chartground_edit/configs/phase4b_smoke1.py --base-model /home/dqwang/Model/InternVL3-2B --full-pth /home/dqwang/Model/Sa2VA-InternVL3-2B-train/sa2va_full_bf16.pth --output /tmp/chartground_edit_phase4b_smoke1/iter_1.pth --base-repo-id OpenGVLab/InternVL3-2B --base-revision 899155015275a9b7338c7f4677e19c784e0e5a21 --sa2va-hf-revision 15837dcaecc304714a1f0f069e74f47e47521c7f --full-pth-sha256 5aa030f3203487281abcb57d7dbed72bba618b9f08859e1c020085454b2822e6`
+- 模型/冻结门禁：full PTH 对构建模型为 0 missing/0 unexpected；仅 `text_hidden_fcs.{0.weight,0.bias,2.weight,2.bias}` 可训练，共 2,754,304 parameters；optimizer 参数集合完全相同；LLM、vision、InternVL `mlp1`、SAM2 均冻结
+- 对齐：supervised assistant `[SEG]` position 1840 与一个 GT mask 严格 1:1；`legacy_fix_number_called=false`
+- loss：language `0.2747028172`，mask CE `0.0920886174`，Dice `0.0545147285`，total `0.4213061631`，全部 finite
+- gradient/update：clip 前 gradient norm `27.5787943892`；4/4 trainable tensors 有非零有限梯度；冻结参数梯度 0；step 后 changed elements `2,754,304`，最大绝对变化 `4.0072947741e-05`，全可训练元素平均绝对变化 `1.5423816660e-05`
+- 时间/显存：模型构建并移至 CUDA `49.9327 s`；forward `0.9984 s`；backward `0.0792 s`；optimizer.step `0.0616 s`；PyTorch peak allocated/reserved `7,211.7173/7,570.0 MiB`
+- checkpoint：`/tmp/chartground_edit_phase4b_smoke1/iter_1.pth`，11,020,648 bytes，SHA-256 `c99044844a51b6c109908d957718aaf91a75177f5c9e5d755fb2c75eb8087936`；仅 4 个 FP32 `text_hidden_fcs.*` tensor，共 2,754,304 elements；包含 alignment/base/full-PTH/P2/smoke/step metadata；与 step 后内存值一致，清零后经正式 projection loader 逐 tensor 精确重载一致
+- OOM/重试：未 OOM，未重试；严格只有一次 forward、一次 backward、一次 optimizer.step
+- 验证：alignment/runtime 专项 21/21 通过；ChartGround-Edit 限定全量 175/175 通过（193 条既有 Pillow、NVML/CPU 或第三方 warning）；projection checkpoint 独立审计、compileall、配置解析和 `git diff --check` 通过
+- GPU 释放：进程退出后物理 GPU 5 为 2 MiB used、24,252 MiB free、0% utilization
+- 结论：Phase 4B-1 单步训练门禁通过；该结果只证明梯度和保存/重载闭环，不是精度评测。可以另行进入预注册的 Phase 4C 32-sample overfit，但本轮未运行
+
 ## 2026-09-17 Phase 4B-0 alignment hard gate and parse-only smoke config
 
 - 日期：2026-09-17

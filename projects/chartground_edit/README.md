@@ -2,7 +2,7 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：Phase 1–3C 已完成；Phase 4A 的训练源码审计、train-only smoke1/overfit32 子集冻结和纯数据契约已完成。P2 `target_only_zh` 保持冻结，模型训练、forward/backward 和 checkpoint 转换均未执行。审计发现 P2 用户文本与 official assistant target 各含一个 `[SEG]`，而现有训练 forward 不按 labels 过滤用户 token；该问题是 Phase 4B 前的硬门禁，当前不能宣称训练链路可用。
+当前状态：Phase 1–3C、Phase 4A 和 Phase 4B 单样本单步门禁已完成。P2 `target_only_zh` 保持冻结；真实 Sa2VA-InternVL3-2B 已仅用 `text_hidden_fcs` 完成恰好一次 forward/backward/optimizer.step，loss、梯度、冻结边界、参数更新和 projection-only checkpoint 重载均通过。尚未运行 Phase 4C 32-sample overfit 或任何完整训练。
 
 ## MVP
 
@@ -310,6 +310,36 @@ mask。任何不匹配立即报错，strict 路径不调用 legacy 修复。默�
 batch/accumulation=1、BF16、max_iters=1、无 val/test/resume，输出仅到 `/tmp`。本轮没有
 构建模型、加载权重或训练。完整复现、配置与 checkpoint 输入输出门禁见
 [`docs/phase4b_alignment_protocol.md`](docs/phase4b_alignment_protocol.md)。
+
+## Phase 4B-1：真实单步 smoke
+
+固定 base 为 `OpenGVLab/InternVL3-2B` revision
+`899155015275a9b7338c7f4677e19c784e0e5a21`。官方 `convert_to_pth.py` 生成的 full BF16
+PTH 经 key/dtype 审计后，用物理 RTX 3090 GPU 5 构建真实模型；只有四个
+`text_hidden_fcs.*` tensor 可训练，共 2,754,304 parameters。单次运行得到 finite 的
+language/mask-CE/Dice/total loss，4/4 trainable tensors 有非零梯度，冻结参数无梯度，
+step 后全部 2,754,304 个目标元素发生变化；峰值 allocated/reserved 为
+7,211.72/7,570.0 MiB，无 OOM、无重试。
+
+可复现命令（路径由 CLI 传入，不写入版本化配置）：
+
+```bash
+CUDA_VISIBLE_DEVICES=<FREE_GPU> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+projects/sa2va/.venv/bin/python \
+  projects/chartground_edit/scripts/run_phase4b_smoke1.py \
+  --config projects/chartground_edit/configs/phase4b_smoke1.py \
+  --base-model <LOCAL_INTERNVL3_2B> \
+  --full-pth <LOCAL_SA2VA_FULL_BF16_PTH> \
+  --output /tmp/chartground_edit_phase4b_smoke1/iter_1.pth \
+  --base-repo-id OpenGVLab/InternVL3-2B \
+  --base-revision 899155015275a9b7338c7f4677e19c784e0e5a21 \
+  --sa2va-hf-revision 15837dcaecc304714a1f0f069e74f47e47521c7f \
+  --full-pth-sha256 <VERIFIED_SHA256>
+```
+
+输出 `iter_1.pth` 为 11,020,648 bytes，只含四个 FP32 projection tensor 和身份/对齐
+metadata；保存值与内存一致，并已通过清零后正式 loader 精确重载。该 smoke 不评价
+IoU，也没有运行 val/test；它只解除进入预注册 Phase 4C 32-sample overfit 的工程门禁。
 
 ## 开发路线
 

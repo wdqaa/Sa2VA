@@ -106,7 +106,9 @@ model = dict(
         visual_encoder_lora=None,
     ),
     tokenizer=tokenizer,
-    grounding_encoder=dict(type=SAM2TrainRunner),
+    # The converted full PTH supplies all grounding_encoder weights. Avoid a
+    # redundant intermediate SAM2 checkpoint load during construction.
+    grounding_encoder=dict(type=SAM2TrainRunner, ckpt_path=None),
     loss_mask=dict(
         type=CrossEntropyLoss,
         use_sigmoid=True,

@@ -198,9 +198,17 @@ labels-aware token selection 和 strict one-to-one policy；strict 在 MLLM forw
 metadata 和专项测试；没有构建模型、加载权重、执行 forward/backward/optimizer 或
 val/test。
 
-Phase 4B-1 尚未获准开始。剩余唯一门禁是 checkpoint materialization/round-trip：本机
-缺少独立 InternVL3-2B base，且固定 Sa2VA HF revision 尚未实际转 full PTH，也未验证
-projection-only checkpoint 经 `convert_to_hf.py` 的完整重载。
+### Phase 4B-1 实际状态（2026-09-17）
+
+已固定并验证 `OpenGVLab/InternVL3-2B` revision
+`899155015275a9b7338c7f4677e19c784e0e5a21`，并使用官方 `convert_to_pth.py` 将固定
+Sa2VA HF revision 转成 4.63 GB、1,589 tensor 的完整 BF16 PTH。物理 GPU 5 上真实构建
+模型后，只有四个 `text_hidden_fcs.*` tensor 可训练，共 2,754,304 parameters；仅对
+smoke1 执行了一次 forward、backward 和 optimizer.step。三项 loss 与 total loss 均
+finite，4/4 projection tensors 获得非零梯度，冻结参数无梯度，step 后参数真实改变；
+峰值 allocated/reserved 为 7,211.72/7,570.0 MiB，无 OOM、无重试。projection-only
+`iter_1.pth` 仅含四个目标 tensor，并已通过清零后正式 loader 的逐 tensor 精确重载。
+Phase 4B-1 门禁通过；本轮未运行 32 样本、val/test 或完整 HF 导出。
 
 ### 目标
 

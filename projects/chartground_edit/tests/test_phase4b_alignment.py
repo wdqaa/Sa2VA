@@ -28,6 +28,8 @@ from chartground_edit.training.sa2va_adapter import (
 from chartground_edit.training.runtime import (
     ChartGroundStrategyAModel,
     Phase4BContractHook,
+    load_projection_checkpoint,
+    save_projection_checkpoint,
 )
 from projects.sa2va.models import DirectResize
 from projects.sa2va.models.sa2va import Sa2VAModel, get_seg_hidden_states
@@ -214,6 +216,40 @@ def test_strategy_a_checkpoint_contains_only_projection_and_alignment_metadata()
     assert metadata["checkpoint_state"] == "text_hidden_fcs_only"
 
 
+def test_projection_checkpoint_round_trip_is_exact_and_fail_closed(tmp_path) -> None:
+    model = object.__new__(ChartGroundStrategyAModel)
+    nn.Module.__init__(model)
+    model.frozen_backbone = nn.Linear(2, 2)
+    model.text_hidden_fcs = nn.Sequential(nn.Linear(2, 2), nn.Linear(2, 1))
+    model.requires_grad_(False)
+    model.text_hidden_fcs.requires_grad_(True)
+    model.expected_trainable_parameter_count = sum(
+        parameter.numel() for parameter in model.text_hidden_fcs.parameters()
+    )
+    model.alignment_metadata = {}
+    expected = {
+        name: parameter.detach().clone()
+        for name, parameter in model.named_parameters()
+        if parameter.requires_grad
+    }
+    path = tmp_path / "iter_1.pth"
+    save_projection_checkpoint(model, path, {"optimizer_step": 1})
+    payload = torch.load(path, map_location="cpu", weights_only=True)
+    assert set(payload["state_dict"]) == set(expected)
+    assert all(name.startswith("text_hidden_fcs.") for name in payload["state_dict"])
+    with torch.no_grad():
+        for parameter in model.text_hidden_fcs.parameters():
+            parameter.zero_()
+    metadata = load_projection_checkpoint(model, path)
+    assert metadata["optimizer_step"] == 1
+    assert all(
+        torch.equal(dict(model.named_parameters())[name], value)
+        for name, value in expected.items()
+    )
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        save_projection_checkpoint(model, path, {})
+
+
 @pytest.fixture(scope="module")
 def real_smoke_batch():
     checkpoint = Path(
@@ -319,6 +355,7 @@ def test_phase4b_config_is_one_step_train_only_strategy_a() -> None:
     assert cfg.model.object_count_policy == "strict_one_to_one"
     assert cfg.model.expected_masks_per_sample == 1
     assert cfg.model.frozen_sam2_decoder is True
+    assert cfg.model.grounding_encoder.ckpt_path is None
     assert cfg.model.mllm.freeze_llm is True
     assert cfg.model.mllm.freeze_visual_encoder is True
     assert cfg.model.mllm.llm_lora is None

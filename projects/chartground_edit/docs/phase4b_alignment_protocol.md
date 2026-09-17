@@ -1,6 +1,6 @@
 # Phase 4B-0 `[SEG]`—mask 对齐协议
 
-状态：**静态门禁实现完成；训练、模型构建和权重转换均未运行。**
+状态：**Phase 4B-0 静态门禁与 Phase 4B-1 真实单步 smoke 均已通过。**
 
 ## 原始错误与真实复现
 
@@ -90,7 +90,7 @@ val/test、无 resume，输出 `/tmp/chartground_edit_phase4b_smoke1`。LLM、vi
 由 `error_if_nonfinite=True` 的 grad clipping 失败；logger interval=1 会记录三个 loss、
 total loss、grad norm，hook 补充 peak CUDA memory。checkpoint metadata 保存完整对齐策略。
 
-配置只解析过，没有构建模型。路径通过 MMEngine 环境变量替换，也可用 CLI
+Phase 4B-0 时配置只做了解析；Phase 4B-1 已由专用单步脚本真实构建并执行一次。路径通过 MMEngine 环境变量替换，也可用 CLI
 `--cfg-options` 覆盖：`CHARTGROUND_BASE_MODEL_PATH`、`CHARTGROUND_SA2VA_PTH`、
 `CHARTGROUND_SA2VA_HF_REVISION`。版本化配置不含用户名绝对路径。
 
@@ -100,35 +100,34 @@ total loss、grad norm，hook 补充 peak CUDA memory。checkpoint metadata 保�
    Sa2VA-InternVL3-2B HF 目录；本地目录的 index 声明 2,316,157,234 parameters、
    8,656,605,384 bytes，实际目录约 8.1 GiB。
 2. 使用 `tools/convert_to_pth.py <HF_DIR> --arch-type internvl --save-path
-   /tmp/chartground_edit_phase4b_input/Sa2VA-InternVL3-2B.full.bf16.pth` 生成唯一训练输入。
+   <EXTERNAL_DIR>/sa2va_full_bf16.pth` 生成唯一训练输入。
    该工具加载整个 HF 模型，把 `vision_model/language_model/mlp*` key 映射回
    `mllm.model.*`，把 `.g_weight` 还原为 `.gamma`，然后保存 raw state dict。它以
    `torch_dtype=torch.bfloat16` 加载，所以不只是字符串 key mapping：浮点权重会按
-   Transformers 加载规则进入 BF16；非浮点 buffer 不应被描述为 BF16。预计输出仍约
-   8.1 GiB。转换本轮未运行。
+   Transformers 加载规则进入 BF16。实际输出为 4,632,880,109 bytes，SHA-256
+   `5aa030f3203487281abcb57d7dbed72bba618b9f08859e1c020085454b2822e6`；1,589 个 tensor
+   均为 BF16，共 2,316,157,490 parameters。
 3. 训练还需要匹配的本地 `OpenGVLab/InternVL3-2B` base 目录；`InternVLMLLM` 先从该
-   base 构建，再由上述 full PTH 覆盖 Sa2VA 权重。revision 由版本化配置、实验记录和
+   base 构建，再由上述 full PTH 覆盖 Sa2VA 权重。实际固定 repo/revision 为
+   `OpenGVLab/InternVL3-2B` / `899155015275a9b7338c7f4677e19c784e0e5a21`。revision 由版本化配置、实验记录和
    训练 checkpoint 的 `chartground_phase4b` metadata 保存；`convert_to_pth.py` 自身不写
    revision metadata。
 4. 单步输出固定为 `/tmp/chartground_edit_phase4b_smoke1/iter_1.pth`。策略 A subclass 的
    `state_dict()` 只保存四个 `text_hidden_fcs.*` tensor；MMEngine wrapper 另含 config/meta，
-   不含 optimizer。按 FP32 projection tensor 估计约 11 MiB 原始 tensor 数据，最终文件
-   大小待真实运行验证。
-5. 重载时仍以相同 base + full PTH 构建模型，再加载 `iter_1.pth` 的 projection subset。
-   导出调用 `tools/convert_to_hf.py phase4b_smoke1.py iter_1.pth --save-path
-   /tmp/chartground_edit_phase4b_smoke1_hf`；该工具会构建完整模型、加载 subset、调用
-   `all_state_dict()` 并导出完整 HF 目录，预计再次约 8.1 GiB。现有 HF inference backend
-   只能加载这个完整导出目录，不能直接加载 projection-only `.pth`。
+   不含 optimizer。实际文件为 11,020,648 bytes、4 个 FP32 tensor、2,754,304 elements，
+   SHA-256 `c99044844a51b6c109908d957718aaf91a75177f5c9e5d755fb2c75eb8087936`。
+5. 正式 `load_projection_checkpoint` 只接受与当前四个 trainable names 完全相同的 key
+   集合，并核验参数量 metadata；真实运行已将内存 projection 清零后逐 tensor 精确恢复。
+   按本轮约束没有构建第二个 2B 模型，也没有导出完整 HF。现有 HF inference backend
+   若要直接使用微调结果，后续仍需显式完整 HF 导出；这不是进入 Phase 4C 训练的门禁。
 
-仓库有 `convert_to_hf.py`，不需要另找 `pth_to_hf`；但本轮禁止转换/模型加载，因此
-HF→PTH key/dtype 完整性、projection subset 重载和 PTH→HF 后的逐 key/hash 复核仍未实测。
-此外本机尚未发现匹配的独立 InternVL3-2B base 目录。两者合并为 Phase 4B-1 前唯一的
-checkpoint materialization/round-trip 门禁，不能把静态代码路径当成已无损验证。
+## Phase 4B-1 真实结果
 
-## Phase 4B-1 验收标准
-
-在不访问 val/test 的前提下，先完成并审计上述 checkpoint 输入；随后只允许一个 smoke1
-optimizer step。必须逐项证明 loss finite、projection gradient finite/nonzero、其余模块无
-gradient、grad norm finite、projection 参数发生变化、`iter_1.pth` 只含预期 keys、训练态
-新进程重载成功、完整 HF 导出重载成功。任何一步失败都停止，不增加 step，也不进入
-overfit32。
+只读取 smoke1/train，执行恰好一次 forward、backward 和 optimizer.step。language、mask
+CE、Dice、total loss 分别为 0.2747028172、0.0920886174、0.0545147285、0.4213061631，
+全部 finite。clip 前 gradient norm 为 27.5787943892；4/4 projection tensors 有非零有限
+gradient，冻结参数 gradient 数为 0。step 后 changed elements=2,754,304，最大/平均绝对
+变化为 `4.0072947741e-05` / `1.5423816660e-05`。构建、forward、backward、step 分别为
+49.9327/0.9984/0.0792/0.0616 秒；峰值 allocated/reserved 为 7,211.7173/7,570.0 MiB。
+没有 OOM 或重试；进程退出后 GPU 显存已释放。P2 registry/template hashes 均未改变，
+strict 记录仍为 assistant position 1840 对一个 GT mask，未调用 `fix_number=5`。
