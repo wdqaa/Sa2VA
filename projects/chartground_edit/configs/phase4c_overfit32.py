@@ -2,7 +2,15 @@
 
 _base_ = ["./phase4b_smoke1.py"]
 
-work_dir = "/tmp/chartground_edit_phase4c_overfit32"
+import os
+import tempfile
+from pathlib import Path
+
+
+work_dir = os.environ.get(
+    "CHARTGROUND_WORK_DIR",
+    str(Path(tempfile.gettempdir()) / "chartground_edit_phase4c_overfit32"),
+)
 experiment_name = "phase4c_overfit32"
 expected_train_samples = 32
 training_epochs = 10

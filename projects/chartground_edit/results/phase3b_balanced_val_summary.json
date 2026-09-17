@@ -4,7 +4,7 @@
   "backend_instance_count": 1,
   "bootstrap_iterations": 10000,
   "bootstrap_seed": 20260916,
-  "checkpoint_path": "/home/dqwang/Model/Sa2VA-InternVL3-2B",
+  "checkpoint_path": "<MODEL_ROOT>/Sa2VA-InternVL3-2B",
   "checkpoint_revision": "15837dcaecc304714a1f0f069e74f47e47521c7f",
   "code_commit": "b022e4d10c8f6fc922fd3d18790ef999b85f36a2",
   "code_worktree_dirty_at_start": true,
@@ -48,7 +48,7 @@
     "inference_run": false,
     "legacy_inference_success_preserved": true,
     "model_loaded": false,
-    "protocol_sha256": "5de44dcf8e21845aaf3d8c5355faedd62b80899cc54b698e7fe2731aa839ef1d",
+    "protocol_sha256": "aab7038ec674e53360ef81b7310d8dcfdc4a9eba04107cb11d200da2cd13c9b9",
     "source": "existing 192 scalar records and saved predicted masks"
   },
   "model_load_attempts": 1,
@@ -2804,8 +2804,8 @@
     "target_only_zh"
   ],
   "protocol_path": "projects/chartground_edit/docs/phase3b_benchmark_protocol.md",
-  "protocol_sha256_end": "5de44dcf8e21845aaf3d8c5355faedd62b80899cc54b698e7fe2731aa839ef1d",
-  "protocol_sha256_start": "5de44dcf8e21845aaf3d8c5355faedd62b80899cc54b698e7fe2731aa839ef1d",
+  "protocol_sha256_end": "aab7038ec674e53360ef81b7310d8dcfdc4a9eba04107cb11d200da2cd13c9b9",
+  "protocol_sha256_start": "aab7038ec674e53360ef81b7310d8dcfdc4a9eba04107cb11d200da2cd13c9b9",
   "protocol_unchanged": true,
   "sample_count": 64,
   "selection": {

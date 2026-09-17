@@ -2,6 +2,10 @@
 
 _base_ = []
 
+import os
+import tempfile
+from pathlib import Path
+
 from mmengine.dataset import DefaultSampler
 from mmengine.hooks import (
     CheckpointHook,
@@ -33,7 +37,10 @@ path = "{{$CHARTGROUND_BASE_MODEL_PATH:__REQUIRED_CHARTGROUND_BASE_MODEL_PATH__}
 pretrained_pth = "{{$CHARTGROUND_SA2VA_PTH:__REQUIRED_CHARTGROUND_SA2VA_PTH__}}"
 source_hf_revision = "{{$CHARTGROUND_SA2VA_HF_REVISION:15837dcaecc304714a1f0f069e74f47e47521c7f}}"
 
-work_dir = "/tmp/chartground_edit_phase4b_smoke1"
+work_dir = os.environ.get(
+    "CHARTGROUND_WORK_DIR",
+    str(Path(tempfile.gettempdir()) / "chartground_edit_phase4b_smoke1"),
+)
 batch_size = 1
 accumulative_counts = 1
 max_iters = 1

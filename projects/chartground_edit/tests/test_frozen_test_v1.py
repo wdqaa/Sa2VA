@@ -31,7 +31,7 @@ from chartground_edit.inference.split_evaluation import SplitEvaluationError
 ROOT = Path(__file__).resolve().parents[3]
 MANIFEST = ROOT / "projects/chartground_edit/data/synthetic_v1/annotations.jsonl"
 RUNNER = ROOT / "projects/chartground_edit/scripts/run_frozen_test_v1.py"
-CHECKPOINT = Path("/home/dqwang/Model/Sa2VA-InternVL3-2B")
+CHECKPOINT = ROOT
 
 
 def _annotations() -> list[dict[str, Any]]:

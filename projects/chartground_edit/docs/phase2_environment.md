@@ -30,7 +30,7 @@
 
 ```bash
 # 此尝试失败：当前 pip 的 SOCKS 支持不完整，未改变环境。
-/home/dqwang/miniconda3/envs/chartground/bin/python -m pip install uv
+<PYTHON> -m pip install uv
 
 # setup_env.sh 明确给出的 uv 安装方式；成功安装 uv 0.12.14。
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -40,7 +40,7 @@ bash setup_env.sh sa2va latest
 
 # latest 未声明 pytest。为执行本项目验收测试，单独固定测试工具版本；
 # 此命令不修改 pyproject.toml 或 uv.lock，也不改变模型关键依赖。
-/home/dqwang/.local/bin/uv pip install \
+uv pip install \
   --python projects/sa2va/.venv/bin/python pytest==9.1.1
 ```
 
@@ -120,7 +120,7 @@ GPU 0..6 = NVIDIA GeForce RTX 3090
 ```text
 repo_id: ByteDance/Sa2VA-InternVL3-2B
 declared revision: 15837dcaecc304714a1f0f069e74f47e47521c7f
-local path: /home/dqwang/Model/Sa2VA-InternVL3-2B
+local path: <MODEL_ROOT>/Sa2VA-InternVL3-2B
 ```
 
 校验结果：

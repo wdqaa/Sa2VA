@@ -84,7 +84,7 @@ nearest resize 的 GT 都使用同一个完整画幅缩放，不存在只变换�
 
 `configs/phase4b_smoke1.py` 基于官方 `sa2va_in30_2b.py`/`sa2va_finetune.py`：只读
 smoke1，micro batch=1，accumulation=1，BF16，`max_iters=1`，seed 20260916，无
-val/test、无 resume，输出 `/tmp/chartground_edit_phase4b_smoke1`。LLM、vision、InternVL
+val/test、无 resume，输出 `<WORK_DIR>`。LLM、vision、InternVL
 `mlp1` 和整个 SAM2 冻结，只开启 `text_hidden_fcs`。模型构建后会核验所有 trainable name
 前缀和预注册参数量 2,754,304。非有限 total loss 在 backward 前失败，非有限 gradient
 由 `error_if_nonfinite=True` 的 grad clipping 失败；logger interval=1 会记录三个 loss、
@@ -112,7 +112,7 @@ Phase 4B-0 时配置只做了解析；Phase 4B-1 已由专用单步脚本真实�
    `OpenGVLab/InternVL3-2B` / `899155015275a9b7338c7f4677e19c784e0e5a21`。revision 由版本化配置、实验记录和
    训练 checkpoint 的 `chartground_phase4b` metadata 保存；`convert_to_pth.py` 自身不写
    revision metadata。
-4. 单步输出固定为 `/tmp/chartground_edit_phase4b_smoke1/iter_1.pth`。策略 A subclass 的
+4. 单步输出固定为 `<WORK_DIR>/iter_1.pth`。策略 A subclass 的
    `state_dict()` 只保存四个 `text_hidden_fcs.*` tensor；MMEngine wrapper 另含 config/meta，
    不含 optimizer。实际文件为 11,020,648 bytes、4 个 FP32 tensor、2,754,304 elements，
    SHA-256 `c99044844a51b6c109908d957718aaf91a75177f5c9e5d755fb2c75eb8087936`。

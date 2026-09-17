@@ -114,7 +114,7 @@ disjoint；没有 empty 或 no-SEG 转换。
 
 ![Phase 2C val-only Prompt diagnostic](../assets/phase2c_prompt_diagnostic.png)
 
-完整临时结果位于 `/tmp/chartground_edit_phase2c_prompt_diagnostic`，包含 12 条
+完整临时结果位于 `<WORK_DIR>`，包含 12 条
 `result.json`/mask/Prompt/文本，以及 `results.jsonl`、`summary.json`、
 `summary.csv`、`paired_results.json`、`paired_results.csv` 和 `gallery.png`。
 

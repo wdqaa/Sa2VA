@@ -42,11 +42,17 @@ def projection_identity() -> dict[str, str]:
 
 def validate_selected_projection(path: str | Path) -> dict[str, Any]:
     """Require the exact Phase 5A step960 projection and its four tensors."""
+    return _validate_projection(path, expected_sha256=SELECTED_PROJECTION_SHA256)
+
+
+def _validate_projection(
+    path: str | Path, *, expected_sha256: str
+) -> dict[str, Any]:
     import torch
 
     checkpoint_path = Path(path)
     actual_sha256 = sha256_file(checkpoint_path)
-    if actual_sha256 != SELECTED_PROJECTION_SHA256:
+    if actual_sha256 != expected_sha256:
         raise ValueError(
             "Phase 5B only accepts the frozen step960 projection: "
             f"sha256={actual_sha256}"

@@ -42,6 +42,6 @@ mean IoU 都提升，增益范围为 `+0.003507`（bar/category）到 `+0.936499
 （bar/appearance）。这证明 strategy A 在固定训练集上有学习/记忆能力，不代表 val、
 test 或真实数据泛化。
 
-完整 checkpoint、逐步日志和预测 mask 位于 `/tmp/chartground_edit_phase4c_overfit32`
-与 `/tmp/chartground_edit_phase4c_eval`；仓库只保留紧凑 metrics、summary 和固定每组首个
+完整 checkpoint、逐步日志和预测 mask 位于 `<WORK_DIR>`
+与 `<WORK_DIR>`；仓库只保留紧凑 metrics、summary 和固定每组首个
 样本的 gallery。

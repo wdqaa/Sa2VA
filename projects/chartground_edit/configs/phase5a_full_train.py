@@ -2,7 +2,15 @@
 
 _base_ = ["./phase4c_overfit32.py"]
 
-work_dir = "/tmp/chartground_edit_phase5a_full_train"
+import os
+import tempfile
+from pathlib import Path
+
+
+work_dir = os.environ.get(
+    "CHARTGROUND_WORK_DIR",
+    str(Path(tempfile.gettempdir()) / "chartground_edit_phase5a_full_train"),
+)
 experiment_name = "phase5a_full_train"
 expected_train_samples = 192
 training_epochs = 10

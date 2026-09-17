@@ -32,7 +32,7 @@
   "phase4b_optimizer_steps": 1,
   "phase4c_max_optimizer_steps": 400,
   "seed": 20260916,
-  "output_dir": "/tmp/chartground_edit_phase4b_smoke1",
+  "output_dir": "<WORK_DIR>",
   "prohibited_splits": [
     "val",
     "test"

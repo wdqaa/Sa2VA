@@ -111,7 +111,7 @@
 
 ### 当前环境快照
 
-在 2026-09-15 的只读检查中，当前 shell 使用 `/home/dqwang/miniconda3/envs/llava/bin/python`（Python 3.10.21），而 `projects/sa2va/pyproject.toml` 声明 `requires-python = ">=3.11,<3.12"`；仓库内未发现 `projects/sa2va/.venv`，当前 PATH 也没有 `uv`。`nvidia-smi` 无法与 NVIDIA 驱动通信，因此本轮不能确认可用 GPU、CUDA 或显存。上述检查没有安装依赖、创建环境或加载模型。
+在 2026-09-15 的只读检查中，当前 shell 使用 `<PYTHON>`（Python 3.10.21），而 `projects/sa2va/pyproject.toml` 声明 `requires-python = ">=3.11,<3.12"`；仓库内未发现 `projects/sa2va/.venv`，当前 PATH 也没有 `uv`。`nvidia-smi` 无法与 NVIDIA 驱动通信，因此本轮不能确认可用 GPU、CUDA 或显存。上述检查没有安装依赖、创建环境或加载模型。
 
 ## 数据集设计
 

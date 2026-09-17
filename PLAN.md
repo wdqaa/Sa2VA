@@ -143,7 +143,7 @@ frozen-test 的唯一全局 Prompt。P2−P1 的 paired bootstrap 95% CI 为
 已在独立冻结协议下，仅使用 Phase 3B 选定的全局 P2 `target_only_zh`，对
 `synthetic_v1` 64 条 test 各执行一次 Sa2VA-InternVL3-2B BF16 推理。模型加载一次，
 backend 调用 64/64，未比较 P0/P1、未重跑 val/train、未选择性重试，protocol 前后
-SHA-256 均为 `4d97adbf7fb3c9e958a58028f7ab3986cda71071fa4a48c9a0c2d66a9bd88817`。
+SHA-256 均为 `3e2aa95825b369746db5bd667912bbfd74d0288c5c9a5ddb9c75ce3bb3593478`。
 execution、mask contract 和 `[SEG]` 均为 64/64；空预测 27/64，nonempty-disjoint
 7/64。16-group Macro IoU/Dice 为 0.198033/0.242366，Micro IoU/Dice 为
 0.225301/0.367748。37 个非空预测全部由 predicted mask 成功执行真实 action/parameters，
@@ -216,7 +216,7 @@ Phase 4B-1 门禁通过；本轮未运行 32 样本、val/test 或完整 HF 导�
 `text_hidden_fcs.*` tensor（2,754,304 parameters），完成 10 epoch、320 optimizer
 steps；每条样本恰好出现 10 次。沿用预注册协议的 AdamW `lr=4e-5`、weight decay
 `0.05`、5% linear warmup + cosine，其余模块全部冻结。训练无 OOM、无重试，三份
-projection-only checkpoint 位于 `/tmp/chartground_edit_phase4c_overfit32`。
+projection-only checkpoint 位于 `<WORK_DIR>`。
 
 生产推理路径在同一次 HF 模型加载中依次评测 baseline、step32、step128、step320；
 baseline 与训练前逐 mask 哈希完全一致。16-group Macro IoU 从 `0.164664` 提升至
@@ -299,6 +299,15 @@ strict projection loader 和既有 editor；本阶段没有根据 test 修改模
 - 使用 GT mask 时编辑结果正确；模型误分割不得被误归因于编辑器。
 
 ## Phase 6：评测、Demo、README 和开源整理
+
+### Phase 6A 实际状态（2026-09-17）
+
+已将 ChartGround-Edit 整理为 release candidate：项目 README 聚焦能力、架构、最终
+结果、Quick Start、数据/训练复现与局限；根 README 增加 Sa2VA 扩展入口；新增
+projection Model Card；无 GT Demo 的参数、四种编辑动作与输出契约均由 mock/unit test
+覆盖。版本化结果中的数值字段保持不变，本机用户名、绝对模型路径、固定物理 GPU 编号
+和临时目录已替换为公开占位符；历史协议只做路径脱敏，相关发布版 hash metadata 同步，
+Phase 5B protocol 未改变。未运行模型、训练、val/test 或新增实验。
 
 ### 目标
 

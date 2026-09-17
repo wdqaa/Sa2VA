@@ -10,7 +10,7 @@
 - manifest SHA-256：`ebad55fd98356204e572ffe6607a16a34c9dde8a916a9977a7f08bc4aed2ba82`
 - test sample-ID list SHA-256：`3061387f0012b13c2fd998d81819df0e7648e8e47ae9ad86ff06490ecfe2e5c4`
 - Prompt registry SHA-256：`dc822a33b84b1cdfb72f84bd5288f0ebb37626980496107c5e30d4c4c26217c0`
-- protocol SHA-256（前/后）：`4d97adbf7fb3c9e958a58028f7ab3986cda71071fa4a48c9a0c2d66a9bd88817` / `4d97adbf7fb3c9e958a58028f7ab3986cda71071fa4a48c9a0c2d66a9bd88817`
+- protocol SHA-256（前/后）：`3e2aa95825b369746db5bd667912bbfd74d0288c5c9a5ddb9c75ce3bb3593478` / `3e2aa95825b369746db5bd667912bbfd74d0288c5c9a5ddb9c75ce3bb3593478`
 - 模型加载 1 次；backend 调用 64/64；验证通过：True
 
 ## 整体指标
@@ -168,7 +168,7 @@ easy 到 medium/hard 时 mean IoU 为 0.329028/0.166467/0.103122，同时 empty 
 | cgev1_bar_trend_ef677a2abf | bar/trend | 0.000000 | 0.000000 | True | True | False | True |
 | cgev1_confidence_band_appearance_b8cfa20f03 | confidence_band/appearance | 0.000000 | 0.000000 | True | True | True | False |
 
-- 完整临时输出：`/tmp/chartground_edit_phase3c_frozen_test`
+- 完整临时输出：`<WORK_DIR>`
 - 标量记录：`results/phase3c_frozen_test_metrics.jsonl`
 - 聚合结果：`results/phase3c_frozen_test_summary.json`
 - gallery：`assets/phase3c_frozen_test_gallery.png`

@@ -6,7 +6,7 @@
 
 ## 1. 范围与证据边界
 
-本轮只读取当前仓库、Conda 环境、`/home/dqwang/Model`、Hugging Face 本地缓存和磁盘状态，并查询了 ByteDance 官方 Hugging Face 仓库的小型元数据。未下载模型或数据，未安装/升级依赖，未加载模型，未执行推理或训练，也未修改 Sa2VA 核心代码。
+本轮只读取当前仓库、Conda 环境、`<MODEL_ROOT>`、Hugging Face 本地缓存和磁盘状态，并查询了 ByteDance 官方 Hugging Face 仓库的小型元数据。未下载模型或数据，未安装/升级依赖，未加载模型，未执行推理或训练，也未修改 Sa2VA 核心代码。
 
 以下“路径完整”仅表示当前源码中能追踪到从图像和文本到原图尺寸二值 mask 的静态调用链；由于当前环境没有 PyTorch、也没有完整 Sa2VA checkpoint，运行时兼容性和峰值显存均为**未确认**。远端 checkpoint 内的 `trust_remote_code` 与本地 `projects/sa2va/hf/` 是否逐字节一致也**未确认**，Phase 2B 应固定 checkpoint revision 并在执行前复查下载代码。
 
@@ -19,7 +19,7 @@
 - 当前显存占用：GPU 0/1 为 8,690 MiB；GPU 2/3/4 为 24,252 MiB；GPU 5 为 13,278 MiB；GPU 6 为 13,866 MiB。
 - 按总量减占用计算，GPU 0/1 各约有 15,886 MiB 可用，GPU 2/3/4 各约 324 MiB，GPU 5 约 11,298 MiB，GPU 6 约 10,710 MiB。占用是瞬时状态，Phase 2B 启动前必须重新检查。
 - `/home`：15 TiB 总量，13 TiB 已用，约 2.0 TiB 可用，使用率 87%。
-- 当前解释器：`/home/dqwang/miniconda3/envs/chartground/bin/python`，Python 3.11.16。
+- 当前解释器：`<PYTHON>`，Python 3.11.16。
 - 当前解释器不能导入 `torch`，也没有 `transformers`，因此当前**不具备运行条件**。
 - `projects/sa2va/.venv` 不存在；命令行中没有找到 `uv`。
 
@@ -137,11 +137,11 @@
 
 | 资源 | 路径 | 状态与用途判断 |
 |---|---|---|
-| Qwen3-VL-4B-Instruct | `/home/dqwang/Model/Qwen3-VL-4B-Instruct` | 目录约 12 MiB；index 声明约 8.27 GiB 权重，但 2 个 shard 都不存在。它还是基础 `Qwen3VLForConditionalGeneration`，不是包含 SAM2/text projection 的 Sa2VA checkpoint。不可直接使用。 |
-| llava-v1.5-7b | `/home/dqwang/Model/llava-v1.5-7b` | 约 13 GiB，两个原始 LLaVA shard 存在；配置类为 `LlavaLlamaForCausalLM`，不是 Sa2VA HF 路径要求的组合模型，也没有 SAM2/text projection。不可直接作为本阶段 checkpoint。 |
-| Qwen3-1.7B | `/home/dqwang/Model/Qwen3-1.7B` | 约 3.8 GiB，文本基础模型，不是 Sa2VA。 |
-| vicuna-7b-v1.5 | `/home/dqwang/Model/vicuna-7b-v1.5` | 约 13 GiB，基础语言模型，不是 Sa2VA。 |
-| Qwen2.5-1.5B/3B-Instruct | `/home/dqwang/Model/Qwen2.5-1.5B-Instruct`、`/home/dqwang/Model/Qwen2.5-3B-Instruct` | 分别约 2.9/5.8 GiB，文本基础模型，不是 Sa2VA。 |
+| Qwen3-VL-4B-Instruct | `<MODEL_ROOT>/Qwen3-VL-4B-Instruct` | 目录约 12 MiB；index 声明约 8.27 GiB 权重，但 2 个 shard 都不存在。它还是基础 `Qwen3VLForConditionalGeneration`，不是包含 SAM2/text projection 的 Sa2VA checkpoint。不可直接使用。 |
+| llava-v1.5-7b | `<MODEL_ROOT>/llava-v1.5-7b` | 约 13 GiB，两个原始 LLaVA shard 存在；配置类为 `LlavaLlamaForCausalLM`，不是 Sa2VA HF 路径要求的组合模型，也没有 SAM2/text projection。不可直接作为本阶段 checkpoint。 |
+| Qwen3-1.7B | `<MODEL_ROOT>/Qwen3-1.7B` | 约 3.8 GiB，文本基础模型，不是 Sa2VA。 |
+| vicuna-7b-v1.5 | `<MODEL_ROOT>/vicuna-7b-v1.5` | 约 13 GiB，基础语言模型，不是 Sa2VA。 |
+| Qwen2.5-1.5B/3B-Instruct | `<MODEL_ROOT>/Qwen2.5-1.5B-Instruct`、`<MODEL_ROOT>/Qwen2.5-3B-Instruct` | 分别约 2.9/5.8 GiB，文本基础模型，不是 Sa2VA。 |
 | HF cache refs | `~/.cache/huggingface/hub/models--Qwen--Qwen3-VL-4B-Instruct`、`~/.cache/huggingface/hub/models--liuhaotian--llava-v1.5-7b` | 只发现 refs 等小文件，未发现可用 snapshot 权重。 |
 
 结论：本地**没有完整、代码版本明确且可直接加载的 Sa2VA checkpoint**。
@@ -315,18 +315,18 @@ Phase 2B 的完成条件只是“真实模型输出端到端可追溯且失败�
 
 ```bash
 # 1. 用户批准安装依赖且 uv 可用后，从仓库根目录创建隔离的 legacy 环境
-cd /home/dqwang/Projects/Sa2VA
+cd <REPO_ROOT>
 bash setup_env.sh sa2va legacy
 
 # 2. 用户批准下载后，固定 revision 下载首选 checkpoint
 huggingface-cli download ByteDance/Sa2VA-1B \
   --revision 82faf06c93f6ce3fdc0ad3d45b57fd52c463daeb \
-  --local-dir /home/dqwang/Model/Sa2VA-1B
+  --local-dir <MODEL_ROOT>/Sa2VA-1B
 
 # 3. Phase 2B 启动前只读预检
 nvidia-smi --query-gpu=index,name,memory.total,memory.used \
   --format=csv,noheader
-/home/dqwang/Projects/Sa2VA/projects/sa2va/.venv/bin/python -c \
+<REPO_ROOT>/projects/sa2va/.venv/bin/python -c \
   "import torch, transformers; print(torch.__version__, torch.version.cuda, transformers.__version__)"
 ```
 

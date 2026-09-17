@@ -68,26 +68,26 @@ Macro 指标对全部 4 条样本逐条平均，包括 IoU/Dice 为 0 的结果�
 
 ## 产物与运行命令
 
-完整临时结果位于 `/tmp/chartground_edit_phase2b2_test`，包含每样本的
+完整临时结果位于 `<WORK_DIR>`，包含每样本的
 `result.json`、文本、mask、overlay、predicted-mask 编辑图和 comparison，以及根级
 `results.jsonl`、`summary.json`、`summary.csv`、`gallery.png`。版本化总览：
 
 ![Sa2VA-InternVL3-2B synthetic_v0 test zero-shot results](../assets/sa2va_2b_zeroshot_test.png)
 
 ```bash
-CUDA_VISIBLE_DEVICES=2 \
+CUDA_VISIBLE_DEVICES=<GPU_ID> \
 HF_HUB_OFFLINE=1 \
 TRANSFORMERS_OFFLINE=1 \
 projects/sa2va/.venv/bin/python \
   projects/chartground_edit/scripts/run_sa2va_split.py \
-  --checkpoint /home/dqwang/Model/Sa2VA-InternVL3-2B \
+  --checkpoint <MODEL_ROOT>/Sa2VA-InternVL3-2B \
   --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
   --split test \
   --device cuda:0 \
   --dtype bfloat16 \
   --expected-count 4 \
   --continue-on-sample-error \
-  --output-dir /tmp/chartground_edit_phase2b2_test
+  --output-dir <WORK_DIR>
 ```
 
 第一次从受限执行沙箱启动时，GPU 设备不可见，backend 在 CUDA 门槛处产生

@@ -76,7 +76,7 @@ EXPECTED_P2_TEMPLATE_SHA256 = (
     "37a785d086a80fef21fd69014670b3892acad5c379722cb79658fb837a923806"
 )
 EXPECTED_PROTOCOL_SHA256 = (
-    "4d97adbf7fb3c9e958a58028f7ab3986cda71071fa4a48c9a0c2d66a9bd88817"
+    "3e2aa95825b369746db5bd667912bbfd74d0288c5c9a5ddb9c75ce3bb3593478"
 )
 DEFAULT_PROTOCOL = Path("projects/chartground_edit/docs/phase3c_frozen_test_protocol.md")
 DEFAULT_REPOSITORY_RESULTS = Path("projects/chartground_edit/results")
@@ -1099,7 +1099,7 @@ def _write_report(summary: dict[str, Any], output_path: Path) -> None:
     lines.extend(
         [
             "",
-            "- 完整临时输出：`/tmp/chartground_edit_phase3c_frozen_test`",
+            "- 完整临时输出：由运行时 `--output-dir` 指定",
             "- 标量记录：`results/phase3c_frozen_test_metrics.jsonl`",
             "- 聚合结果：`results/phase3c_frozen_test_summary.json`",
             "- gallery：`assets/phase3c_frozen_test_gallery.png`",

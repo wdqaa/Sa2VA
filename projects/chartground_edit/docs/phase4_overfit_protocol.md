@@ -4,7 +4,7 @@
 
 ## 共同冻结项与代码边界
 
-- checkpoint：`/home/dqwang/Model/Sa2VA-InternVL3-2B`，revision
+- checkpoint：`<MODEL_ROOT>/Sa2VA-InternVL3-2B`，revision
   `15837dcaecc304714a1f0f069e74f47e47521c7f`；训练前需按官方
   `tools/convert_to_pth.py` 产生并验证训练态 `.pth`，转换不属于 Phase 4A。
 - manifest 与 P2 registry hash 沿用已冻结值；只允许 `split=train` 和两份版本化 ID
@@ -13,8 +13,8 @@
   LoRA **禁用**（r/alpha/dropout 均 N/A）。这是先证明 mask-loss 梯度闭环的最小路径。
 - BF16；seed `20260916`；AdamW lr 4e-5、betas (0.9,0.999)、weight decay 0.05、
   grad clip max-norm 1，沿用官方数值。language gradient checkpointing 保持官方开启。
-- 输出只能写 `/tmp/chartground_edit_phase4b_smoke1` 或
-  `/tmp/chartground_edit_phase4c_overfit32`，不得写 repo root 或 dataset tree。
+- 输出只能写 `<WORK_DIR>` 或
+  `<WORK_DIR>`，不得写 repo root 或 dataset tree。
 - P2 双 `[SEG]` / `fix_number=5` 代码门禁已由 labels-aware + strict one-to-one 解决并通过
   真实 tokenizer/collator 静态验证。执行前仍必须完成 full PTH materialization 和
   HF→PTH→训练 subset→HF round-trip 审计；不得改 P2。
@@ -47,7 +47,7 @@ accumulation=1，只允许 1 个 optimizer step，不设 epoch 重复过拟合�
 CUDA_VISIBLE_DEVICES=<FREE_GPU_INDEX> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
 projects/sa2va/.venv/bin/python tools/train.py \
   projects/chartground_edit/configs/phase4b_smoke1.py \
-  --work-dir /tmp/chartground_edit_phase4b_smoke1 \
+  --work-dir <WORK_DIR> \
   --launcher none --seed 20260916
 ```
 

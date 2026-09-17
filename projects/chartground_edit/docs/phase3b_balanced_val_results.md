@@ -12,7 +12,7 @@
 - dtype：BF16；单卡；FlashAttention；无量化、offload 或 device map
 - 物理 GPU 0 → 进程内 `cuda:0`，NVIDIA GeForce RTX 3090
 - manifest SHA-256：`ebad55fd98356204e572ffe6607a16a34c9dde8a916a9977a7f08bc4aed2ba82`
-- protocol SHA-256：`5de44dcf8e21845aaf3d8c5355faedd62b80899cc54b698e7fe2731aa839ef1d`
+- protocol SHA-256：`aab7038ec674e53360ef81b7310d8dcfdc4a9eba04107cb11d200da2cd13c9b9`
 - Prompt registry SHA-256：`dc822a33b84b1cdfb72f84bd5288f0ebb37626980496107c5e30d4c4c26217c0`
 - protocol 前后 hash 相同；模型加载 1 次；192/192 backend 调用完成；没有重试
 - 落盘 192 个二值原尺寸 mask；逐个独立重算像素计数、IoU 和 Dice，0 个不一致
@@ -21,7 +21,7 @@
 正式命令：
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/run_prompt_benchmark_v1.py --checkpoint /home/dqwang/Model/Sa2VA-InternVL3-2B --manifest projects/chartground_edit/data/synthetic_v1/annotations.jsonl --split val --device cuda:0 --dtype bfloat16 --expected-samples 64 --output-dir /tmp/chartground_edit_phase3b_balanced_val
+CUDA_VISIBLE_DEVICES=<GPU_ID> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/run_prompt_benchmark_v1.py --checkpoint <MODEL_ROOT>/Sa2VA-InternVL3-2B --manifest projects/chartground_edit/data/synthetic_v1/annotations.jsonl --split val --device cuda:0 --dtype bfloat16 --expected-samples 64 --output-dir <WORK_DIR>
 ```
 
 ## Prompt 聚合指标
@@ -173,7 +173,7 @@ gallery 每组固定选择 sample ID 字典序最小者，与模型效果无关�
 
 ![Phase 3B balanced val Prompt benchmark](../assets/phase3b_balanced_val_prompt_benchmark.png)
 
-- 完整临时输出：`/tmp/chartground_edit_phase3b_balanced_val`
+- 完整临时输出：`<WORK_DIR>`
 - 标量记录：`results/phase3b_balanced_val_metrics.jsonl`
 - 聚合结果：`results/phase3b_balanced_val_summary.json`
 - gallery：`assets/phase3b_balanced_val_prompt_benchmark.png`

@@ -1,441 +1,201 @@
 # ChartGround-Edit
 
-ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
+ChartGround-Edit 是基于 Sa2VA-InternVL3-2B 的科学图表指代分割与可控编辑系统，
+支持用自然语言定位曲线、柱体、散点序列和置信区间，并执行 `highlight`、
+`recolor`、`extract`、`remove`。
 
-当前状态：Phase 1–5B 已完成。P2 `target_only_zh` 保持冻结；真实
-Sa2VA-InternVL3-2B 仅训练 `text_hidden_fcs`。固定 val 选择 step960 后，在唯一一次
-64 条 fine-tuned test 中，16-group Macro IoU/Dice 达到 `0.428948/0.534238`，相对
-保存的 zero-shot test 提升 `+0.230916/+0.291872`，empty rate 从 `42.1875%` 降至
-`0%`。没有根据 test 重训、换 checkpoint 或调整 Prompt。
+## 核心能力
 
-## MVP
+- 自然语言指代分割与细粒度图表图元定位
+- 完整的 predicted-mask 编辑闭环，不使用 GT mask 修正预测
+- 覆盖 16 个 chart/referring 组合的 balanced synthetic benchmark
+- 只更新 2,754,304 个 projection 参数的 parameter-efficient tuning
+- 严格的 train/val/test 隔离、预注册 checkpoint 选择和一次性 frozen test
+- 可复现的数据生成、对齐审计、训练、指标聚合和无 GT Demo CLI
 
-- 图表：折线图、柱状图、散点图、带置信区间的科学曲线图
-- 指代：类别、外观、图例、趋势
-- 编辑：`highlight`、`recolor`、`extract`、`remove`
-- 暂不支持：字符级 OCR 分割、数学公式理解、复杂三维图表和开放域编辑
+## 架构
 
-## 当前目录结构
+```mermaid
+flowchart LR
+    A[Image + Referring Expression] --> B[InternVL3 Multimodal Encoder]
+    B --> C[Supervised assistant SEG hidden state]
+    C --> D[text_hidden_fcs]
+    D --> E[SAM2 mask decoder]
+    E --> F[Predicted mask]
+    F --> G[Controllable editor]
 
-```text
-projects/chartground_edit/
-├── README.md
-├── assets/                 # README 使用的版本化展示资产
-├── configs/                # Phase 4 train-only ID 清单与设计态配置
-├── docs/                   # 标注、JSONL、数据卡与编辑语义规范
-├── data/                   # 本地生成的 synthetic_v0（生成物被 gitignore）
-├── scripts/                # 数据、校验、编辑 CLI 与 gallery 入口
-├── tests/                  # 数据、几何、编辑器与 CLI 测试
-└── chartground_edit/       # Python 包
-    ├── datasets/           # schema、reader、合成生成器、同步变换
-    ├── editing/            # GT/predicted mask 均可复用的确定性编辑后端
-    ├── inference/          # Sa2VA backend、结果类型、mask 后处理与指标
-    ├── training/           # 不加载模型的 train-only 契约与子集选择
-    └── visualization/      # 原图/mask/overlay/目标裁剪及 contact sheet
+    U[User Prompt SEG] -. labels = -100; excluded .-> C
+    T[Training] -. only labels != -100 assistant SEG .-> C
+    P[Projection tuning] -. only text_hidden_fcs trainable .-> D
+    Q[Inference] -. loads about 11 MB projection checkpoint .-> D
 ```
 
-## Phase 1A 快速使用
+训练对齐使用
+`(input_ids == seg_token_idx) AND (labels != -100)`，因此 Prompt 中的用户
+`[SEG]` 不参与 mask 对齐；每个样本严格要求一个 supervised assistant `[SEG]`
+对应一个 GT mask。LLM、vision backbone、InternVL `mlp1` 和 SAM2 均冻结。
 
-从仓库根目录运行；命令只生成本地小图，不下载数据或模型：
+## 结果
 
-```bash
-PYTHONPATH=projects/chartground_edit python \
-  projects/chartground_edit/scripts/generate_synthetic_v0.py \
-  --output-dir projects/chartground_edit/data/synthetic_v0 \
-  --seed 20260915 --clean
-```
+所有定量结果均来自 Pillow 生成的 `synthetic_v1`，不能解释为真实论文图表上的
+泛化结果。Macro 指标对 16 个 `chart_type × referring_type` 组合等权平均。
 
-生成后可打开：
+| 阶段 | split / scope | checkpoint | Macro IoU | Macro Dice | Empty rate |
+|---|---|---|---:|---:|---:|
+| Zero-shot | test 64 | Sa2VA HF baseline | 0.198033 | 0.242366 | 42.1875% |
+| Overfit32 | train 32 | step320 | 0.569468 | 0.674806 | 0% |
+| Full train | val 64 | step960 | 0.426042 | 0.532503 | 0% |
+| Fine-tuned | test 64 | frozen step960 | **0.428948** | **0.534238** | **0%** |
 
-- `projects/chartground_edit/data/synthetic_v0/annotations.jsonl`
-- `projects/chartground_edit/data/synthetic_v0/gallery.png`
-- `projects/chartground_edit/data/synthetic_v0/visualizations/*.png`
+仅训练 2.75M 参数，约占 2.316B 参数训练模型的 **0.12%**。一次性 fine-tuned
+test 相对 zero-shot 的 Macro IoU 提升 **+0.2309**，empty rate 从 **42.19%**
+降至 **0%**；Micro IoU/Dice 为 `0.397803/0.569183`。完整统计见
+[Phase 5B results](docs/phase5b_finetuned_test_results.md) 和
+[saved summary](results/phase5b_finetuned_test_summary.json)。
 
-运行测试：
+![Fine-tuned test: one deterministic sample from each of 16 groups](assets/phase5b_finetuned_test_gallery.png)
 
-```bash
-python -m pytest projects/chartground_edit/tests -q
-```
+编辑器也可独立使用 GT 或外部 mask 做像素级验证：
 
-可单独验证已有 manifest：
+![Deterministic mask editing operations](assets/editing_v0_gallery.png)
 
-```bash
-PYTHONPATH=projects/chartground_edit python \
-  projects/chartground_edit/scripts/validate_jsonl_v0.py \
-  projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
-  --expected-count 32
-```
+## Quick Start
 
-协议详见 `docs/annotation_spec_v0.md` 与 `docs/jsonl_schema_v0.md`，数据限制详见 `docs/data_card_synthetic_v0.md`。
+### 1. 环境与 checkpoint
 
-## Phase 1B：使用 mask 编辑
-
-编辑接口只接收 RGB Pillow 图像、二值 mask、动作名和参数，不依赖 Sa2VA 或 annotation 数据结构。完整契约见 `docs/editing_spec_v0.md`。
-
-```python
-from chartground_edit.editing import edit
-
-edited = edit(image, mask, "recolor", {"color": "#E63946"})
-```
-
-CLI 可从仓库根目录直接运行：
-
-```bash
-python projects/chartground_edit/scripts/edit_with_mask.py \
-  --image projects/chartground_edit/data/synthetic_v0/images/cge_bar_category_01.png \
-  --mask projects/chartground_edit/data/synthetic_v0/masks/cge_bar_category_01.png \
-  --action recolor \
-  --output /tmp/chartground_edit_recolor.png \
-  --color "#E63946"
-```
-
-CLI 同时提供 `--highlight-strength` 和 `--remove-fill-mode {color,neighbor}`；运行 `--help` 可查看完整参数。四种动作的 v0 语义为：
-
-- `highlight`：mask 内保持原样，mask 外按强度变暗并降低饱和度；这是唯一预期修改 mask 外的动作。
-- `recolor`：仅修改 mask 内色相/饱和度，并保留原像素 HSL lightness。
-- `extract`：返回 RGBA，mask 外 alpha 为 0，mask 内保留原 RGB。
-- `remove`：仅在 mask 内使用固定色或确定性邻域中位数填充，不进行内容恢复或生成式修复。
-
-![Phase 1B ground-truth mask editing gallery](assets/editing_v0_gallery.png)
-
-gallery 可复现生成：
-
-```bash
-python projects/chartground_edit/scripts/generate_editing_gallery.py \
-  --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
-  --output projects/chartground_edit/assets/editing_v0_gallery.png
-```
-
-## Phase 2 环境准备
-
-Sa2VA-InternVL3-2B 使用仓库 `latest` 依赖组。环境入口由官方脚本创建在
-`projects/sa2va/.venv`，物理目录位于 `/tmp/sa2va_env`：
+从仓库根目录创建并激活 Sa2VA 环境：
 
 ```bash
 bash setup_env.sh sa2va latest
 source projects/sa2va/.venv/bin/activate
 ```
 
-checkpoint 路径不得硬编码；ChartGround-Edit CLI 使用必填
-`--checkpoint PATH` 参数。当前环境版本、完整安装记录、离线约定、checkpoint
-校验结果和已知依赖 metadata 冲突见
-[`docs/phase2_environment.md`](docs/phase2_environment.md)。
+所需模型身份：
 
-## Phase 2B-1：单样本 Sa2VA baseline
+- Base：`OpenGVLab/InternVL3-2B@899155015275a9b7338c7f4677e19c784e0e5a21`
+  （仅训练构建使用）
+- Sa2VA HF：`ByteDance/Sa2VA-InternVL3-2B@15837dcaecc304714a1f0f069e74f47e47521c7f`
+- Projection：约 11 MB 的 `chartground_projection_step960.pth`，SHA-256
+  `64c0d109d2985893ba1f2ba4c4fe7acc4265dc758e5d56ecb6ac8e2aa791f41e`
 
-CLI 从 JSONL 读取原图、GT 和未经补充的原始 instruction，固定构造一个 Prompt，
-再将模型的第一个预测 mask 交给指标与现有编辑器。`--skip-model-run` 可在无 GPU
-时验证输入和 Prompt，且不会加载模型：
+Projection checkpoint 不在 Git 中；发布者需另行提供下载地址并让用户校验 hash。
+
+### 2. 无 GT 推理与编辑
+
+```bash
+CUDA_VISIBLE_DEVICES=<GPU_ID> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+projects/sa2va/.venv/bin/python \
+  projects/chartground_edit/scripts/run_chartground_edit.py \
+  --checkpoint <SA2VA_CHECKPOINT> \
+  --projection-checkpoint <PROJECTION_CHECKPOINT> \
+  --image <IMAGE> \
+  --referring-expression "图中上升最快的折线" \
+  --action recolor --color "#E63946" \
+  --output-dir <OUTPUT_DIR> \
+  --device cuda:0 --dtype bfloat16
+```
+
+CLI 不接收 GT mask。它输出：
+
+- `predicted_mask.png`
+- `overlay.png`
+- `edited.png`（预测非空且编辑成功时）
+- `result.json`
+
+四种动作均由 `--action {highlight,recolor,extract,remove}` 选择；可选参数包括
+`--color`、`--strength`、`--fill-mode` 和 `--neighbor-radius`。
+
+## 数据复现
+
+`synthetic_v1` 共 320 条，train/val/test=`192/64/64`。四种图表
+（line、bar、scatter、confidence band）与四种指代
+（category、appearance、legend、trend）组成 16 个组合，并覆盖四种编辑动作。
 
 ```bash
 projects/sa2va/.venv/bin/python \
-  projects/chartground_edit/scripts/run_sa2va_baseline.py \
-  --checkpoint /path/to/Sa2VA-InternVL3-2B \
-  --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
-  --sample-id cge_bar_category_01 \
-  --device cuda:0 --dtype bfloat16 \
-  --edit-action recolor --edit-color "#E63946" \
-  --output-dir /tmp/chartground_edit_phase2b1_smoke \
-  --skip-model-run
-```
+  projects/chartground_edit/scripts/generate_synthetic_v1.py \
+  --output-dir <DATA_DIR> --seed 20260916 --clean \
+  --gallery-output <OUTPUT_DIR>/synthetic_v1_gallery.png
 
-2026-09-15 的唯一真实 smoke 使用 checkpoint revision
-`15837dcaecc304714a1f0f069e74f47e47521c7f`。模型生成
-`Sure, [SEG].<|im_end|>` 并返回一个非空 bool mask，但预测了错误柱体，实际
-IoU/Dice 均为 0.0。编辑链路成功不代表分割正确；尚未运行完整 test split。
-
-![Sa2VA-InternVL3-2B single-sample smoke result](assets/sa2va_2b_smoke.png)
-
-## Phase 2B-2：固定 test split 零样本基线
-
-批量入口在一个进程中创建一个 backend，并按 manifest 顺序处理 split；模型只加载
-一次，单样本失败不会触发重试。以下命令固定选择 4 条 test 样本，仍使用 Phase
-2B-1 的唯一 Prompt 和第一个预测 mask：
-
-```bash
-CUDA_VISIBLE_DEVICES=2 \
-HF_HUB_OFFLINE=1 \
-TRANSFORMERS_OFFLINE=1 \
 projects/sa2va/.venv/bin/python \
-  projects/chartground_edit/scripts/run_sa2va_split.py \
-  --checkpoint /path/to/Sa2VA-InternVL3-2B \
-  --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
-  --split test --device cuda:0 --dtype bfloat16 \
-  --expected-count 4 --continue-on-sample-error \
-  --output-dir /tmp/chartground_edit_phase2b2_test
-```
+  projects/chartground_edit/scripts/validate_synthetic_v1.py \
+  --manifest <DATA_DIR>/annotations.jsonl --expected-count 320
 
-2026-09-15 的真实运行中，4/4 inference success、0/4 空预测、2/4 nonempty
-disjoint；macro mean IoU/Dice 为 0.035667/0.064015，micro IoU/Dice 为
-0.006158/0.012241。模型只加载一次。所有编辑图均由 predicted mask 驱动；错误预测
-也完整保留在下图中。
-
-![Sa2VA-InternVL3-2B synthetic_v0 test zero-shot results](assets/sa2va_2b_zeroshot_test.png)
-
-这只是 4 条合成样本的诊断性 baseline，不是最终统计结果。test split 未用于 Prompt
-选择；后续 Prompt 诊断只能在 val split 上进行。逐样本输出、文本、耗时、显存和
-结果解释见 [`docs/phase2_zeroshot_results.md`](docs/phase2_zeroshot_results.md)。
-
-## Phase 2C：val-only Prompt 诊断
-
-split 审计确认 synthetic_v0 存在生成顺序偏置：train 只有 appearance/legend/trend，
-val 和 test 都只有 category；val 全是 highlight，test 全是 recolor。具体交叉表与适用
-边界见 [`docs/synthetic_v0_split_audit.md`](docs/synthetic_v0_split_audit.md)。原 manifest
-没有修改。
-
-Phase 2C 将 synthetic-v0 instruction 确定性拆成 `referring_expression`、
-`edit_action` 和显式 `edit_parameters`，并只在 val 上比较三个预注册 Prompt：
-
-```bash
-CUDA_VISIBLE_DEVICES=1 \
-HF_HUB_OFFLINE=1 \
-TRANSFORMERS_OFFLINE=1 \
 projects/sa2va/.venv/bin/python \
-  projects/chartground_edit/scripts/run_prompt_diagnostic.py \
-  --checkpoint /path/to/Sa2VA-InternVL3-2B \
-  --manifest projects/chartground_edit/data/synthetic_v0/annotations.jsonl \
-  --split val \
-  --prompt-variants full_instruction,target_only_en,target_only_zh \
-  --device cuda:0 --dtype bfloat16 --expected-count 4 \
-  --output-dir /tmp/chartground_edit_phase2c_prompt_diagnostic
+  projects/chartground_edit/scripts/audit_synthetic_v1.py \
+  --manifest <DATA_DIR>/annotations.jsonl --expected-count 320 \
+  --near-duplicate-threshold 0.01 --output-json <OUTPUT_DIR>/audit.json
 ```
 
-脚本明确拒绝 `--split test`。真实 4×3 运行中三个 Prompt 都达到 100% inference
-success 和 100% `[SEG]` output rate，含义只是全部样本成功产生协议合法输出，**不代表
-100% segmentation accuracy**。P0/P1/P2 macro IoU 分别为
-0.392236/0.340420/0.351172；删除编辑动作没有显示一致改善。中文 wrapper 保持
-`[SEG]` 输出，但改变了部分 mask 几何。
+生成数据受 Git ignore 保护。Schema、数据卡和泄漏审计说明见
+[jsonl_schema_v1.md](docs/jsonl_schema_v1.md)、
+[data_card_synthetic_v1.md](docs/data_card_synthetic_v1.md) 和
+[synthetic_v1_audit.md](docs/synthetic_v1_audit.md)。
 
-![Phase 2C val-only Prompt diagnostic](assets/phase2c_prompt_diagnostic.png)
+## 训练复现
 
-本诊断只有 4 条 category/highlight 合成 val 样本；P0 最多只能作为 balanced
-synthetic_v1 val 的候选。test 零样本 macro IoU 仍只有 0.035667，且本轮没有重跑或
-用于调 Prompt。完整配对结果、限制和 synthetic_v1 规范见
-[`docs/phase2_prompt_diagnostic.md`](docs/phase2_prompt_diagnostic.md)。
-
-## Phase 3A：balanced synthetic_v1
-
-`synthetic_v1` 使用独立 v1 schema 和 Reader，直接保存 `full_instruction` 与
-`referring_expression`。数据共 320 条，16 个 chart/referring 组合各 20 条，并在每个
-组合内部固定为 train/val/test = 12/4/4；四种 edit action 在每个组合和 split 内严格
-平衡。生成与校验不导入 Torch、Transformers 或 Sa2VA：
+训练需要 base InternVL3-2B 与由官方 `tools/convert_to_pth.py` 生成的 Sa2VA full
+BF16 PTH。以下三条命令共享这些参数：
 
 ```bash
-projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/generate_synthetic_v1.py --output-dir projects/chartground_edit/data/synthetic_v1 --seed 20260916 --clean --gallery-output projects/chartground_edit/assets/synthetic_v1_gallery.png
-
-projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/audit_synthetic_v1.py --manifest projects/chartground_edit/data/synthetic_v1/annotations.jsonl --expected-count 320 --near-duplicate-threshold 0.01 --output-json projects/chartground_edit/data/synthetic_v1/audit.json
-```
-
-独立审计结果为 320/320 schema/file 合法、0 个硬约束失败、0 个空/全一 mask、0 个
-精确 image/mask 重复、0 个 ID/seed/scene/content 重复。保守的低分辨率跨 split 指纹
-报告 97 对人工复核候选，不自动删除；精确内容哈希和底层 content ID 均不同。完整协议、
-来源和审计边界见 [`docs/jsonl_schema_v1.md`](docs/jsonl_schema_v1.md)、
-[`docs/data_card_synthetic_v1.md`](docs/data_card_synthetic_v1.md) 与
-[`docs/synthetic_v1_audit.md`](docs/synthetic_v1_audit.md)。批量数据继续被 Git 忽略。
-
-![Balanced synthetic_v1 gallery](assets/synthetic_v1_gallery.png)
-
-## Phase 3B：balanced-val Prompt benchmark
-
-固定 Sa2VA-InternVL3-2B、BF16 和 Phase 2C 的 P0/P1/P2，在 synthetic_v1 的 64 条 val
-样本上各运行一次，共 192 次。模型只加载一次，protocol 前后 SHA-256 一致，192 个预测
-mask 均独立重算指标通过。按预注册的 16-group Macro IoU 规则选择 P2
-`target_only_zh`：P0/P1/P2 为 0.164503/0.179093/0.182199。
-
-P2 相对 P1 的差值只有 +0.003106，10,000 次 paired group bootstrap 95% CI 为
-[-0.006147, 0.015220]，包含 0。因此 P2 只是 **selected on validation** 的全局 operational
-choice，不能称为显著更优或 test 结论。三种 Prompt 的 `[SEG]` output rate 都是 100%，
-execution success 和 mask contract valid 也均为 64/64；nonempty prediction 分别为
-35/64、36/64、36/64，empty prediction 为 29/64、28/64、28/64。空 mask 是合法模型
-输出，不是执行异常。历史 `inference_success` 字段保留但已 deprecated，不能再展示为
-执行成功率；协议成功同样不代表分割准确率。
-
-![Phase 3B balanced val Prompt benchmark](assets/phase3b_balanced_val_prompt_benchmark.png)
-
-冻结协议和完整结果分别见
-[`docs/phase3b_benchmark_protocol.md`](docs/phase3b_benchmark_protocol.md) 与
-[`docs/phase3b_balanced_val_results.md`](docs/phase3b_balanced_val_results.md)。仓库只保存
-标量 JSONL/summary 和 16 组合 gallery；192 个 mask/overlay 保留在 `/tmp`，不提交 Git。
-Phase 3B 当时没有运行 synthetic_v1 test；后续 Phase 3C 已按该约束使用同一个 P2。
-
-## Phase 3C：frozen synthetic_v1 test baseline
-
-Phase 3C 在模型推理前冻结独立 protocol，仅允许 `split=test` 和 P2
-`target_only_zh`。模型只加载一次，64 条 test 各调用一次，64/64 execution success、
-mask contract valid 和 `[SEG]`；37 条非空、27 条空预测，30 条与 GT 重叠、7 条
-nonempty-disjoint。16-group Macro IoU/Dice 为 0.198033/0.242366，Micro IoU/Dice 为
-0.225301/0.367748。基于 16 个 group 的 10,000 次固定 seed bootstrap 给出 Macro IoU
-95% CI [0.101680, 0.316589]，Macro Dice 95% CI [0.139124, 0.360458]。
-
-全部 37 个非空预测使用该样本真实 action/parameters 和 predicted mask 完成编辑；27 个
-空预测明确跳过，没有用 GT mask 替代。完整临时输出保存在
-`/tmp/chartground_edit_phase3c_frozen_test`，仓库保存 64 条标量、summary 和固定
-16 组 gallery。test 指标不用于修改 Prompt，也没有回到 validation 重新选择。
-
-![Phase 3C frozen synthetic_v1 test baseline](assets/phase3c_frozen_test_gallery.png)
-
-冻结协议和结果分别见
-[`docs/phase3c_frozen_test_protocol.md`](docs/phase3c_frozen_test_protocol.md) 与
-[`docs/phase3c_frozen_test_results.md`](docs/phase3c_frozen_test_results.md)。
-
-## Phase 4A：训练路径审计与 overfit 子集冻结
-
-官方完全匹配的配置是 `projects/sa2va/configs/sa2va_in30_2b.py`；微调示例是
-`sa2va_finetune.py`。两者的实际可训练集合包括 LLM LoRA、完整 embedding/lm_head、
-InternVL `mlp1`、`text_hidden_fcs` 和 SAM2 mask decoder，并非“仅 LoRA”。Phase 4B 推荐先做 projection-only
-策略 A，但必须先解决 P2 双 `[SEG]` 对齐门禁，并验证官方 HF→PTH→HF 转换闭环。
-
-train-only 清单可确定性重建：
-
-```bash
-projects/sa2va/.venv/bin/python \
-  projects/chartground_edit/scripts/prepare_phase4_overfit_subsets.py \
-  --manifest projects/chartground_edit/data/synthetic_v1/annotations.jsonl \
-  --smoke-output projects/chartground_edit/configs/phase4_smoke1_ids.json \
-  --overfit-output projects/chartground_edit/configs/phase4_overfit32_ids.json
-```
-
-smoke1 固定为 `cgev1_bar_category_6d51bac154`。overfit32 覆盖 16 个
-chart/referring 组合各 2 条，action 各 8，difficulty 为 11/10/11；清单不含 val/test、
-scene/content ID 或图片/mask 副本。详见
-[`docs/phase4_training_path_audit.md`](docs/phase4_training_path_audit.md)、
-[`docs/phase4_training_data_contract.md`](docs/phase4_training_data_contract.md) 和
-[`docs/phase4_overfit_protocol.md`](docs/phase4_overfit_protocol.md)。
-
-## Phase 4B-0：训练对齐硬门禁
-
-真实 tokenizer/collator 证明 smoke1 的用户 `[SEG]` 在 position 1823、label=-100，assistant
-`[SEG]` 在 position 1840、label=151674。旧逻辑选择两个并由 `fix_number=5` 静默变成
-5 对；新训练配置按 labels 边界只选择 assistant token，并要求每样本严格 1 token : 1
-mask。任何不匹配立即报错，strict 路径不调用 legacy 修复。默认上游配置仍保留旧行为，
-推理路径未改。
-
-已创建 parse-only 的 `configs/phase4b_smoke1.py`：smoke1/train-only、P2、strategy A、
-batch/accumulation=1、BF16、max_iters=1、无 val/test/resume，输出仅到 `/tmp`。本轮没有
-构建模型、加载权重或训练。完整复现、配置与 checkpoint 输入输出门禁见
-[`docs/phase4b_alignment_protocol.md`](docs/phase4b_alignment_protocol.md)。
-
-## Phase 4B-1：真实单步 smoke
-
-固定 base 为 `OpenGVLab/InternVL3-2B` revision
-`899155015275a9b7338c7f4677e19c784e0e5a21`。官方 `convert_to_pth.py` 生成的 full BF16
-PTH 经 key/dtype 审计后，用物理 RTX 3090 GPU 5 构建真实模型；只有四个
-`text_hidden_fcs.*` tensor 可训练，共 2,754,304 parameters。单次运行得到 finite 的
-language/mask-CE/Dice/total loss，4/4 trainable tensors 有非零梯度，冻结参数无梯度，
-step 后全部 2,754,304 个目标元素发生变化；峰值 allocated/reserved 为
-7,211.72/7,570.0 MiB，无 OOM、无重试。
-
-可复现命令（路径由 CLI 传入，不写入版本化配置）：
-
-```bash
-CUDA_VISIBLE_DEVICES=<FREE_GPU> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+# 1 sample / 1 optimizer step
 projects/sa2va/.venv/bin/python \
   projects/chartground_edit/scripts/run_phase4b_smoke1.py \
   --config projects/chartground_edit/configs/phase4b_smoke1.py \
-  --base-model <LOCAL_INTERNVL3_2B> \
-  --full-pth <LOCAL_SA2VA_FULL_BF16_PTH> \
-  --output /tmp/chartground_edit_phase4b_smoke1/iter_1.pth \
+  --base-model <BASE_CHECKPOINT> --full-pth <SA2VA_FULL_PTH> \
+  --output <WORK_DIR>/iter_1.pth \
   --base-repo-id OpenGVLab/InternVL3-2B \
   --base-revision 899155015275a9b7338c7f4677e19c784e0e5a21 \
   --sa2va-hf-revision 15837dcaecc304714a1f0f069e74f47e47521c7f \
-  --full-pth-sha256 <VERIFIED_SHA256>
-```
+  --full-pth-sha256 <FULL_PTH_SHA256>
 
-输出 `iter_1.pth` 为 11,020,648 bytes，只含四个 FP32 projection tensor 和身份/对齐
-metadata；保存值与内存一致，并已通过清零后正式 loader 精确重载。该 smoke 不评价
-IoU，也没有运行 val/test；它只解除进入预注册 Phase 4C 32-sample overfit 的工程门禁。
-
-## Phase 4C：overfit32 projection-only
-
-配置固定为 train-only overfit32、10 epoch/320 steps、batch/accumulation=1、BF16，且
-只训练 2,754,304 个 `text_hidden_fcs` 参数。实际运行命令如下；模型路径均由 CLI
-提供，未写入版本化配置：
-
-```bash
-CUDA_VISIBLE_DEVICES=<FREE_GPU> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+# overfit32 / 320 steps
 projects/sa2va/.venv/bin/python \
   projects/chartground_edit/scripts/run_phase4c_train.py \
   --config projects/chartground_edit/configs/phase4c_overfit32.py \
-  --base-model <LOCAL_INTERNVL3_2B> \
-  --full-pth <LOCAL_SA2VA_FULL_BF16_PTH> \
-  --full-pth-sha256 <VERIFIED_SHA256> \
-  --output-dir /tmp/chartground_edit_phase4c_overfit32 \
+  --base-model <BASE_CHECKPOINT> --full-pth <SA2VA_FULL_PTH> \
+  --full-pth-sha256 <FULL_PTH_SHA256> --output-dir <WORK_DIR> \
+  --base-repo-id OpenGVLab/InternVL3-2B \
+  --base-revision 899155015275a9b7338c7f4677e19c784e0e5a21 \
+  --sa2va-hf-revision 15837dcaecc304714a1f0f069e74f47e47521c7f
+
+# full train / 1920 steps
+projects/sa2va/.venv/bin/python \
+  projects/chartground_edit/scripts/run_phase4c_train.py \
+  --config projects/chartground_edit/configs/phase5a_full_train.py \
+  --base-model <BASE_CHECKPOINT> --full-pth <SA2VA_FULL_PTH> \
+  --full-pth-sha256 <FULL_PTH_SHA256> --output-dir <WORK_DIR> \
   --base-repo-id OpenGVLab/InternVL3-2B \
   --base-revision 899155015275a9b7338c7f4677e19c784e0e5a21 \
   --sa2va-hf-revision 15837dcaecc304714a1f0f069e74f47e47521c7f
 ```
 
-step32/128/320 的 16-group Macro IoU 分别为 `0.359869 / 0.509776 / 0.569468`，
-baseline 为 `0.164664`；best 为 step320。生产 backend 的可选 projection loader
-严格接受四个预期 tensor，未传 checkpoint 时恢复原始 HF projection。完整训练日志、
-checkpoint 和 mask 留在 `/tmp`；紧凑指标与确定性 16-group gallery 见
-[`docs/phase4c_overfit32_results.md`](docs/phase4c_overfit32_results.md) 和
-[`assets/phase4c_overfit32_gallery.png`](assets/phase4c_overfit32_gallery.png)。
+这些配置固定 P2、labels-aware assistant `[SEG]`、strict one-to-one 对齐和
+projection-only trainables。完整实验记录见仓库根目录 `EXPERIMENTS.md`。
 
-## Phase 5A：完整 train 与 val checkpoint 选择
-
-复用 Phase 4C 的 strategy-A runner 和 strict projection loader，在全部 192 条 train 上
-固定训练 10 epoch/1920 steps；保存 step192/576/960/1344/1920。只在 64 条 val 上
-顺序评测 zero-shot 与五份 checkpoint，按 16-group Macro IoU 选择 step960。各 checkpoint
-Macro IoU 为 `0.182199 / 0.265243 / 0.385975 / 0.426042 / 0.417203 / 0.406564`。
-详细 loss、分组指标和选择边界见
-[`docs/phase5a_full_train_results.md`](docs/phase5a_full_train_results.md)。
-
-![Phase 5A val gallery](assets/phase5a_full_train_val_gallery.png)
-
-## Phase 5B：一次性 fine-tuned test 与无 GT Demo
-
-固定 step960 后只运行一次 64 条 synthetic_v1 test。模型加载一次、每条调用一次；
-execution、mask contract 和 `[SEG]` 均为 64/64。对比数值直接读取 Phase 3C 保存结果，
-没有重跑 zero-shot。
-
-| stage | split/scope | checkpoint | Macro IoU | Macro Dice | empty rate |
-|---|---|---|---:|---:|---:|
-| zero-shot | test 64 | HF baseline | 0.198033 | 0.242366 | 42.1875% |
-| overfit32 | train 32 | step320 | 0.569468 | 0.674806 | 0% |
-| full train | val 64 | step960 | 0.426042 | 0.532503 | 0% |
-| fine-tuned | test 64 | frozen step960 | 0.428948 | 0.534238 | 0% |
-
-overfit32 只表示训练集记忆能力；val 用于一次 checkpoint 选择；fine-tuned test 只用于
-最终一次性报告。完整结果见
-[`docs/phase5b_finetuned_test_results.md`](docs/phase5b_finetuned_test_results.md)。
-
-![Phase 5B fine-tuned test gallery](assets/phase5b_finetuned_test_gallery.png)
-
-持久 checkpoint 放在版本库外，运行时通过 CLI 传入：
+## 测试
 
 ```bash
-CUDA_VISIBLE_DEVICES=<FREE_GPU> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
-projects/sa2va/.venv/bin/python \
-  projects/chartground_edit/scripts/run_chartground_edit.py \
-  --checkpoint /path/to/Sa2VA-InternVL3-2B \
-  --projection-checkpoint /path/to/chartground_projection_step960.pth \
-  --image /path/to/chart.png \
-  --referring-expression "图中上升最快的折线" \
-  --action recolor --color "#E63946" \
-  --output-dir /tmp/chartground_edit_demo \
-  --device cuda:0 --dtype bfloat16
+PYTHONPATH=projects/chartground_edit \
+projects/sa2va/.venv/bin/python -m pytest -q projects/chartground_edit/tests
 ```
 
-该入口不接收 GT mask，输出 `predicted_mask.png`、`overlay.png`、非空预测对应的
-`edited.png` 和 `result.json`。当前主要局限是训练与最终统计均来自合成数据；
-`bar/appearance` test 组仍为 0 IoU，且 projection-only 尚未在真实出版图表上验证。
+测试只限定在项目目录；不要从仓库根目录无范围运行 pytest。
 
-## 开发路线
+## 已知局限
 
-1. Phase 0：完成 Sa2VA 源码地图、环境边界和工程骨架。
-2. Phase 1：冻结最小数据格式，用 32 个样本验证 mask 和可视化。
-3. Phase 2：不训练地跑通 Sa2VA 单图推理基线。
-4. Phase 3：建设可复现的科学图表指代分割数据集。
-5. Phase 4：先通过 32 样本过拟合，再申请完整 LoRA/轻量训练。
-6. Phase 5：实现并独立测试四类 mask 驱动编辑。
-7. Phase 6：完成分层评测、Demo、文档和开源发布检查。
+- 当前定量评测主要基于 Pillow 合成图，未证明真实论文图表上的稳定泛化。
+- Fine-tuned test 的 `bar/appearance` 组仍为 0 IoU。
+- `remove` 是确定性填色或邻域统计替换，不是生成式图像修复。
+- 当前 checkpoint 只更新 projection；LLM、vision encoder 和 SAM2 均未适配。
+- 暂未覆盖复杂子图、3D 图、热力图、组合图及字符级 OCR 分割。
 
-详细范围、源码映射和验收条件见仓库根目录的 `PROJECT.md` 与 `PLAN.md`；实验必须记录在 `EXPERIMENTS.md`。
+## 模型、结果与上游
 
-## 开发约束
+- [Projection model card](MODEL_CARD.md)
+- [Fine-tuned frozen-test protocol](docs/phase5b_finetuned_test_protocol.md)
+- [Fine-tuned frozen-test results](docs/phase5b_finetuned_test_results.md)
+- [Sa2VA upstream project](../sa2va/README.md)
 
-- 默认不修改 `projects/sa2va/` 的核心模型逻辑，优先通过适配器复用。
-- 图像与 mask 的随机几何变换必须共享同一组参数。
-- 未经确认不下载权重或大型数据，不启动完整训练。
-- 所有结果必须来自可复现脚本，失败和未运行状态要明确记录。
+ChartGround-Edit 是 Sa2VA 的扩展项目。代码与模型使用时需同时遵守本仓库、Sa2VA、
+InternVL3 和 SAM2 的许可证及使用条款。

@@ -24,7 +24,7 @@ from chartground_edit.inference.prompt_benchmark_v1 import (
 
 
 EXPECTED_PROTOCOL_SHA256 = (
-    "5de44dcf8e21845aaf3d8c5355faedd62b80899cc54b698e7fe2731aa839ef1d"
+    "aab7038ec674e53360ef81b7310d8dcfdc4a9eba04107cb11d200da2cd13c9b9"
 )
 UNCHANGED_METRICS = (
     "group_macro_iou",

@@ -9,6 +9,7 @@ import json
 import os
 import random
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -147,7 +148,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     os.environ["CHARTGROUND_SA2VA_PTH"] = str(args.full_pth)
     os.environ["CHARTGROUND_SA2VA_HF_REVISION"] = args.sa2va_hf_revision
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-    os.environ.setdefault("MPLCONFIGDIR", "/tmp/chartground_mpl")
+    os.environ.setdefault(
+        "MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "chartground_mpl")
+    )
     cfg = Config.fromfile(args.config)
     if cfg.train_cfg.max_iters != 1 or cfg.train_dataloader.batch_size != 1:
         raise ValueError("Phase 4B smoke config must be exactly one sample/iteration")

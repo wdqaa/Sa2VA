@@ -17,7 +17,7 @@ Bootstrap iterations：`10000`
 ## 固定模型与数据身份
 
 - 模型：`ByteDance/Sa2VA-InternVL3-2B`
-- checkpoint：`/home/dqwang/Model/Sa2VA-InternVL3-2B`（CLI 必填，代码不设本机默认值）
+- checkpoint：`<MODEL_ROOT>/Sa2VA-InternVL3-2B`（CLI 必填，代码不设本机默认值）
 - revision：`15837dcaecc304714a1f0f069e74f47e47521c7f`
 - dtype：BF16
 - 单物理 GPU 映射为进程内 `cuda:0`；不使用 `device_map`、量化或 CPU offload
@@ -105,7 +105,7 @@ Gallery 按固定 chart type 顺序 `line,bar,scatter,confidence_band` 和 refer
 prediction overlay 和 edited result；空预测明确显示 `EMPTY / EDIT SKIPPED`，不隐藏
 IoU=0 或失败案例。
 
-完整临时输出固定为 `/tmp/chartground_edit_phase3c_frozen_test`。仓库只保存 protocol、
+完整临时输出固定为 `<WORK_DIR>`。仓库只保存 protocol、
 结果报告、64 条标量 JSONL、summary JSON 和 16 组 gallery。
 
 ## 协议完整性

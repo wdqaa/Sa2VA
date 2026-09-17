@@ -4,7 +4,7 @@
   "backend_instance_count": 1,
   "bootstrap_iterations": 10000,
   "bootstrap_seed": 20260916,
-  "checkpoint_path": "/home/dqwang/Model/Sa2VA-InternVL3-2B",
+  "checkpoint_path": "<MODEL_ROOT>/Sa2VA-InternVL3-2B",
   "checkpoint_revision": "15837dcaecc304714a1f0f069e74f47e47521c7f",
   "code_commit": "2369a00c441a07b902c0b340bcacd757a7062764",
   "code_worktree_dirty_at_start": true,
@@ -481,7 +481,7 @@
   "projection_checkpoint": {
     "metadata": {
       "base_checkpoint": {
-        "local_path": "/home/dqwang/Model/InternVL3-2B",
+        "local_path": "<MODEL_ROOT>/InternVL3-2B",
         "repo_id": "OpenGVLab/InternVL3-2B",
         "revision": "899155015275a9b7338c7f4677e19c784e0e5a21"
       },
@@ -492,7 +492,7 @@
       "experiment_name": "phase5a_full_train",
       "full_pth": {
         "bytes": 4632880109,
-        "path": "/home/dqwang/Model/Sa2VA-InternVL3-2B-train/sa2va_full_bf16.pth",
+        "path": "<MODEL_ROOT>/Sa2VA-InternVL3-2B-train/sa2va_full_bf16.pth",
         "sha256": "5aa030f3203487281abcb57d7dbed72bba618b9f08859e1c020085454b2822e6",
         "source_hf_revision": "15837dcaecc304714a1f0f069e74f47e47521c7f"
       },
@@ -528,7 +528,7 @@
       "training_split": "train",
       "training_strategy": "text_hidden_fcs_only"
     },
-    "projection_checkpoint_path": "/home/dqwang/Model/ChartGround-Edit/chartground_projection_step960.pth",
+    "projection_checkpoint_path": "<MODEL_ROOT>/ChartGround-Edit/chartground_projection_step960.pth",
     "projection_checkpoint_sha256": "64c0d109d2985893ba1f2ba4c4fe7acc4265dc758e5d56ecb6ac8e2aa791f41e",
     "projection_tensor_count": 4,
     "selected_checkpoint": "step960",

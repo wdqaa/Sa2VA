@@ -17,7 +17,7 @@ Bootstrap seed：`20260916`
 - 模型：`ByteDance/Sa2VA-InternVL3-2B`
 - revision：`15837dcaecc304714a1f0f069e74f47e47521c7f`
 - checkpoint：必须由 CLI 的 `--checkpoint` 参数传入；本机验证路径为
-  `/home/dqwang/Model/Sa2VA-InternVL3-2B`，代码中不得作为默认值硬编码。
+  `<MODEL_ROOT>/Sa2VA-InternVL3-2B`，代码中不得作为默认值硬编码。
 - dtype：BF16
 - 单 GPU；不使用量化、CPU offload 或 `device_map`
 - `local_files_only=True`、`use_flash_attn=True`
