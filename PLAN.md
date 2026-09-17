@@ -225,6 +225,17 @@ baseline 与训练前逐 mask 哈希完全一致。16-group Macro IoU 从 `0.164
 固定 32 条训练样本上的 projection-only learnability，不代表泛化能力。进入完整 train
 前仍需单独批准训练预算；本阶段没有访问 val/test，也没有自动切换 LoRA 或 SAM2。
 
+### Phase 5A 实际状态（2026-09-17）
+
+strategy A 已在完整 synthetic_v1 train 192 条上完成固定 10 epoch/1920 steps；每条
+样本恰好出现 10 次，仍只训练 2,754,304 个 `text_hidden_fcs` 参数。训练无 OOM、无
+重试，五份 checkpoint 均为 projection-only。随后同一次 HF 模型加载只评测 64 条
+val：zero-shot baseline 精确复现 Phase 3B P2，step192/576/960/1344/1920 的
+16-group Macro IoU 分别为 `0.265243/0.385975/0.426042/0.417203/0.406564`。按预注册
+Primary 选择 step960，相对 baseline `0.182199` 提升 `+0.243843`；empty rate 从
+43.75% 降到 0%。本阶段未访问 test，具备另行批准 Phase 5B 单次 fine-tuned test 的
+工程条件。
+
 ### 目标
 
 以最小可训练参数验证模型能学习 ChartGround-Edit 的指代分割。

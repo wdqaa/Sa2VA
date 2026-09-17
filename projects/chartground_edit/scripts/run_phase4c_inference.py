@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate baseline/projection checkpoints on the fixed train-only overfit32."""
+"""Evaluate baseline/projection checkpoints on a frozen synthetic_v1 split."""
 
 from __future__ import annotations
 
@@ -19,12 +19,17 @@ if str(PACKAGE_ROOT) not in sys.path:
 
 from chartground_edit.inference.metrics import dice_score, intersection_over_union
 from chartground_edit.inference.sa2va_backend import Sa2VAInternVL3Backend
-from chartground_edit.training.data_adapter import Phase4TrainDataset
+from chartground_edit.training.data_adapter import Phase4TrainDataset, Phase5SplitDataset
 from chartground_edit.training.overfit32 import (
-    CHECKPOINT_NAMES,
+    CHECKPOINT_NAMES as PHASE4C_CHECKPOINT_NAMES,
     select_gallery_sample_ids,
     summarize_checkpoint_rows,
     summarize_overfit_rows,
+)
+from chartground_edit.training.phase5a import (
+    CHECKPOINT_NAMES as PHASE5A_CHECKPOINT_NAMES,
+    summarize_phase5a_rows,
+    validate_phase3b_baseline,
 )
 from chartground_edit.visualization.render import create_contact_sheet, mask_overlay
 
@@ -33,7 +38,12 @@ def _args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", required=True, type=Path)
     parser.add_argument("--manifest", required=True, type=Path)
-    parser.add_argument("--selection", required=True, type=Path)
+    parser.add_argument("--selection", type=Path)
+    parser.add_argument(
+        "--experiment", choices=("phase4c", "phase5a"), default="phase4c"
+    )
+    parser.add_argument("--split", choices=("train", "val", "test"), default="train")
+    parser.add_argument("--expected-samples", type=int, default=32)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument(
         "--projection", action="append", default=[], metavar="NAME=PATH"
@@ -50,14 +60,16 @@ def _args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _projection_specs(values: list[str]) -> list[tuple[str, Path]]:
+def _projection_specs(
+    values: list[str], checkpoint_names: tuple[str, ...]
+) -> list[tuple[str, Path]]:
     specs = []
     for value in values:
         if "=" not in value:
             raise ValueError(f"invalid projection spec: {value}")
         name, raw_path = value.split("=", 1)
         path = Path(raw_path)
-        if name not in CHECKPOINT_NAMES[1:] or not path.is_file():
+        if name not in checkpoint_names[1:] or not path.is_file():
             raise ValueError(f"invalid projection checkpoint: {value}")
         specs.append((name, path))
     if len({name for name, _ in specs}) != len(specs):
@@ -83,10 +95,24 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
 def run(args: argparse.Namespace) -> dict:
     if args.output_dir.exists():
         raise FileExistsError(f"refusing to reuse output directory: {args.output_dir}")
-    specs = _projection_specs(args.projection)
-    source = Phase4TrainDataset(args.manifest, args.selection)
-    if len(source) != 32 or any(row["split"] != "train" for row in source.records):
-        raise ValueError("Phase 4C inference requires exactly overfit32 train samples")
+    checkpoint_names = (
+        PHASE4C_CHECKPOINT_NAMES
+        if args.experiment == "phase4c"
+        else PHASE5A_CHECKPOINT_NAMES
+    )
+    specs = _projection_specs(args.projection, checkpoint_names)
+    if args.experiment == "phase4c":
+        if args.selection is None or args.split != "train" or args.expected_samples != 32:
+            raise ValueError("Phase 4C inference requires overfit32 train selection")
+        source = Phase4TrainDataset(args.manifest, args.selection)
+    else:
+        if args.selection is not None or args.split != "val" or args.expected_samples != 64:
+            raise ValueError("Phase 5A inference requires the complete val split")
+        source = Phase5SplitDataset(args.manifest, split=args.split)
+    if len(source) != args.expected_samples or any(
+        row["split"] != args.split for row in source.records
+    ):
+        raise ValueError("evaluation split/sample contract failed")
     identity = {
         "source_hf_revision": args.sa2va_hf_revision,
         "full_pth_sha256": args.full_pth_sha256,
@@ -144,6 +170,9 @@ def run(args: argparse.Namespace) -> dict:
                 "split": annotation["split"],
                 "chart_type": annotation["chart_type"],
                 "referring_type": annotation["referring_type"],
+                "edit_action": annotation["edit_action"],
+                "difficulty": annotation["difficulty"],
+                "distractor_count": annotation["distractor_count"],
                 "execution_success": result.failure_reason
                 in (None, "empty_prediction_mask"),
                 "mask_contract_valid": mask_contract_valid,
@@ -165,17 +194,30 @@ def run(args: argparse.Namespace) -> dict:
                 "predicted_mask_sha256": _mask_hash(prediction),
             }
             rows.append(row)
-            print("PHASE4C_PRED=" + json.dumps(row, sort_keys=True), flush=True)
+            print("PROJECTION_EVAL=" + json.dumps(row, sort_keys=True), flush=True)
+        if args.experiment == "phase5a" and checkpoint_name == "baseline":
+            validate_phase3b_baseline(rows)
+            print("PHASE5A_BASELINE_REPRODUCTION=pass", flush=True)
 
     metrics_path = args.output_dir / "metrics.jsonl"
     _write_jsonl(metrics_path, rows)
     if specs:
-        if tuple(name for name, _ in checkpoint_specs) != CHECKPOINT_NAMES:
-            raise ValueError(f"post-training order must be {CHECKPOINT_NAMES}")
-        summary = summarize_overfit_rows(rows)
+        if tuple(name for name, _ in checkpoint_specs) != checkpoint_names:
+            raise ValueError(f"post-training order must be {checkpoint_names}")
+        summary = (
+            summarize_overfit_rows(rows)
+            if args.experiment == "phase4c"
+            else summarize_phase5a_rows(rows)
+        )
     else:
         summary = {
-            "checkpoints": {"baseline": summarize_checkpoint_rows(rows)},
+            "checkpoints": {
+                "baseline": summarize_checkpoint_rows(
+                    rows,
+                    expected_sample_count=args.expected_samples,
+                    expected_per_group=args.expected_samples // 16,
+                )
+            },
             "best_checkpoint": None,
         }
     summary.update(
@@ -183,8 +225,9 @@ def run(args: argparse.Namespace) -> dict:
             "model_load_attempts": backend.model_load_attempts,
             "model_load_time_ms": backend.model_load_time_ms,
             "peak_gpu_memory_mb": backend._peak_gpu_memory_mb(),
-            "sample_count": 32,
-            "split": "train",
+            "experiment": args.experiment,
+            "sample_count": args.expected_samples,
+            "split": args.split,
             "checkpoint_order": [name for name, _ in checkpoint_specs],
         }
     )
@@ -218,15 +261,32 @@ def run(args: argparse.Namespace) -> dict:
             encoding="utf-8",
         )
     if specs and args.gallery_output is not None:
-        _render_gallery(source, rows, args.output_dir, summary, args.gallery_output)
+        _render_gallery(
+            source,
+            rows,
+            args.output_dir,
+            summary,
+            args.gallery_output,
+            expected_per_group=args.expected_samples // 16,
+        )
     if specs and args.report_output is not None:
-        _write_report(summary, args.report_output)
-    print("PHASE4C_INFERENCE_RESULT=" + json.dumps(summary, sort_keys=True))
+        _write_report(summary, args.report_output, experiment=args.experiment)
+    print("PROJECTION_EVAL_RESULT=" + json.dumps(summary, sort_keys=True))
     return summary
 
 
-def _render_gallery(source, rows, output_dir: Path, summary: dict, output: Path) -> None:
-    selected = select_gallery_sample_ids(source.records)
+def _render_gallery(
+    source,
+    rows,
+    output_dir: Path,
+    summary: dict,
+    output: Path,
+    *,
+    expected_per_group: int,
+) -> None:
+    selected = select_gallery_sample_ids(
+        source.records, expected_per_group=expected_per_group
+    )
     best = summary["best_checkpoint"]
     by_key = {(row["checkpoint"], row["sample_id"]): row for row in rows}
     panels = []
@@ -271,11 +331,16 @@ def _render_gallery(source, rows, output_dir: Path, summary: dict, output: Path)
     create_contact_sheet(panels, output, columns=2, thumbnail_width=600)
 
 
-def _write_report(summary: dict, output: Path) -> None:
+def _write_report(summary: dict, output: Path, *, experiment: str) -> None:
+    phase5a = experiment == "phase5a"
     lines = [
-        "# Phase 4C overfit32 results",
+        "# Phase 5A full-train validation results"
+        if phase5a
+        else "# Phase 4C overfit32 results",
         "",
-        "仅使用冻结的 32 条 train 样本；这些指标只表示训练集 learnability。",
+        "仅使用冻结的 64 条 val 样本进行 checkpoint 选择；未访问 test。"
+        if phase5a
+        else "仅使用冻结的 32 条 train 样本；这些指标只表示训练集 learnability。",
         "",
         "| checkpoint | group Macro IoU | group Macro Dice | sample Macro IoU | Micro IoU | empty rate | disjoint rate |",
         "|---|---:|---:|---:|---:|---:|---:|",
@@ -287,7 +352,7 @@ def _write_report(summary: dict, output: Path) -> None:
             f"{metrics['micro_iou']:.6f} | {metrics['empty_rate']:.6f} | "
             f"{metrics['nonempty_disjoint_rate']:.6f} |"
         )
-    lines.extend(["", f"Best training checkpoint: `{summary['best_checkpoint']}`.", ""])
+    lines.extend(["", f"Selected checkpoint: `{summary['best_checkpoint']}`.", ""])
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(lines), encoding="utf-8")
 

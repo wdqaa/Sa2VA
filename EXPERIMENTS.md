@@ -1,5 +1,21 @@
 # ChartGround-Edit 实验记录
 
+## 2026-09-17 Phase 5A full train / val selection
+
+- 实验 ID：`phase5a-full-train-strategy-a-val-selection`；基线 commit `5d042ff`，开始时 clean
+- 数据：synthetic_v1 train 192 条用于梯度，val 64 条仅用于训练后评测；两者均覆盖 16 组合；test 未访问；manifest/P2 未修改
+- 身份：base `OpenGVLab/InternVL3-2B@899155015275a9b7338c7f4677e19c784e0e5a21`；Sa2VA HF `15837dcaecc304714a1f0f069e74f47e47521c7f`；full PTH SHA-256 `5aa030f3203487281abcb57d7dbed72bba618b9f08859e1c020085454b2822e6`
+- 配置：strategy A、2,754,304 trainable parameters、BF16、batch/accumulation `1/1`、AdamW lr `4e-5`、weight decay `0.05`、96-step warmup + cosine、10 epoch/1920 steps；无超参数搜索
+- 训练：1920/1920 完成，每条 train 恰好出现 10 次；epoch 1→10 的 language `0.274937→0.275376`、mask CE `0.546797→0.324230`、Dice `0.318577→0.201959`、total `1.140312→0.801565`；每 epoch 4/4 trainable tensor 非零 gradient，冻结 gradient 0
+- 时间/显存：模型构建 22.009 s，训练循环 679.365 s，peak allocated/reserved `7,336.783/9,178.0 MiB`；无 OOM、无重试
+- checkpoint：`/tmp/chartground_edit_phase5a_full_train/step_{192,576,960,1344,1920}.pth`，每份约 11,020,984 bytes，只含四个 FP32 projection tensor 和 identity/alignment metadata
+- baseline 门禁：val zero-shot Macro IoU/Dice `0.1821985630/0.2162208606`、empty `43.75%`、nonempty `36/64`，在 `1e-9` 容差内复现 Phase 3B P2 后才继续
+- val：step192/576/960/1344/1920 Macro IoU `0.265243/0.385975/0.426042/0.417203/0.406564`，Macro Dice `0.342522/0.485005/0.532503/0.518894/0.509340`；step960 按 Primary 直接胜出，相对 baseline `+0.243843`
+- selected：step960，empty `0%`、overlap `92.1875%`、nonempty-disjoint `7.8125%`；16 组 14 提升、2 下降；最强 `bar/category=0.936221`，最弱 `bar/appearance=0`
+- 验证：Phase 4/5 training 专项 49/49、ChartGround-Edit 全量 190/190 通过；compileall、配置解析、五份 checkpoint 正式 loader 重载、1920/384 行独立完整性检查和 `git diff --check` 均通过
+- GPU 释放：训练/val 推理退出后物理 GPU 0 为 2 MiB used、24,252 MiB free、0% utilization
+- 结论：strategy A 在固定 val 上明显有效，具备另行进入一次性 Phase 5B fine-tuned test 的条件；本轮未运行 test，未启动 LoRA/SAM2 或第二次训练
+
 ## 2026-09-17 Phase 4C overfit32 projection-only
 
 - 日期：2026-09-17

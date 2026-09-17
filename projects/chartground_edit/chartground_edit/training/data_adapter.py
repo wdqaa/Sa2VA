@@ -115,24 +115,63 @@ class Phase4TrainDataset(Sequence[Phase4DataSample]):
     def __getitem__(self, index: int | slice) -> Phase4DataSample | list[Phase4DataSample]:
         if isinstance(index, slice):
             return [self[item] for item in range(*index.indices(len(self)))]
-        record = self.records[index]
-        root = self.manifest_path.parent
-        with Image.open(root / record["image_path"]) as source:
-            image = source.convert("RGB").copy()
-        with Image.open(root / record["mask_path"]) as source:
-            raw_mask = np.asarray(source.convert("L"))
-        mask = (raw_mask == 255).astype(np.uint8, copy=False)[None, ...]
-        prompt = build_prompt_variant(
-            TARGET_ONLY_ZH,
-            instruction=record["full_instruction"],
-            referring_expression=record["referring_expression"],
-        )
-        return Phase4DataSample(
-            sample_id=record["sample_id"],
-            image=image,
-            mask=mask,
-            image_width=record["image_width"],
-            image_height=record["image_height"],
-            prompt=prompt,
-            assistant_target=ASSISTANT_TARGET,
-        )
+        return _load_sample(self.manifest_path, self.records[index])
+
+
+class Phase5SplitDataset(Sequence[Phase4DataSample]):
+    """Read the complete frozen train or val split; test is always forbidden."""
+
+    _EXPECTED_COUNTS = {"train": 192, "val": 64}
+
+    def __init__(self, manifest_path: str | Path, *, split: str):
+        self.manifest_path = Path(manifest_path)
+        if split == "test":
+            raise ValueError("synthetic_v1 test is frozen and forbidden in Phase 5A")
+        if split not in self._EXPECTED_COUNTS:
+            raise ValueError("Phase 5A split must be exactly 'train' or 'val'")
+        manifest_hash = file_sha256(self.manifest_path)
+        if manifest_hash != EXPECTED_MANIFEST_SHA256:
+            raise ValueError(
+                "manifest SHA-256 mismatch: "
+                f"expected {EXPECTED_MANIFEST_SHA256}, got {manifest_hash}"
+            )
+        records = validate_jsonl_v1(self.manifest_path, check_files=True)
+        self.records = [record for record in records if record["split"] == split]
+        expected = self._EXPECTED_COUNTS[split]
+        if len(self.records) != expected:
+            raise ValueError(
+                f"Phase 5A {split} requires {expected} samples, got {len(self.records)}"
+            )
+        self.split = split
+
+    def __len__(self) -> int:
+        return len(self.records)
+
+    def __getitem__(self, index: int | slice) -> Phase4DataSample | list[Phase4DataSample]:
+        if isinstance(index, slice):
+            return [self[item] for item in range(*index.indices(len(self)))]
+        return _load_sample(self.manifest_path, self.records[index])
+
+
+def _load_sample(manifest_path: Path, record: dict[str, Any]) -> Phase4DataSample:
+    """Load one validated record using the frozen P2/assistant contract."""
+    root = manifest_path.parent
+    with Image.open(root / record["image_path"]) as source:
+        image = source.convert("RGB").copy()
+    with Image.open(root / record["mask_path"]) as source:
+        raw_mask = np.asarray(source.convert("L"))
+    mask = (raw_mask == 255).astype(np.uint8, copy=False)[None, ...]
+    prompt = build_prompt_variant(
+        TARGET_ONLY_ZH,
+        instruction=record["full_instruction"],
+        referring_expression=record["referring_expression"],
+    )
+    return Phase4DataSample(
+        sample_id=record["sample_id"],
+        image=image,
+        mask=mask,
+        image_width=record["image_width"],
+        image_height=record["image_height"],
+        prompt=prompt,
+        assistant_target=ASSISTANT_TARGET,
+    )

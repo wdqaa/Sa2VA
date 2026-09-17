@@ -3,6 +3,9 @@
 _base_ = ["./phase4b_smoke1.py"]
 
 work_dir = "/tmp/chartground_edit_phase4c_overfit32"
+experiment_name = "phase4c_overfit32"
+expected_train_samples = 32
+training_epochs = 10
 phase4c_epochs = 10
 max_iters = 320
 checkpoint_steps = [32, 128, 320]

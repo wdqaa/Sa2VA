@@ -16,12 +16,18 @@ CHECKPOINT_NAMES = ("baseline", "step32", "step128", "step320")
 
 
 def build_epoch_schedule(
-    sample_ids: Sequence[str], *, epochs: int, seed: int
+    sample_ids: Sequence[str],
+    *,
+    epochs: int,
+    seed: int,
+    expected_sample_count: int = EXPECTED_SAMPLE_COUNT,
 ) -> list[dict[str, Any]]:
-    if len(sample_ids) != EXPECTED_SAMPLE_COUNT or len(set(sample_ids)) != len(
+    if len(sample_ids) != expected_sample_count or len(set(sample_ids)) != len(
         sample_ids
     ):
-        raise ValueError("Phase 4C requires 32 unique sample IDs")
+        raise ValueError(
+            f"projection training requires {expected_sample_count} unique sample IDs"
+        )
     if epochs != EXPECTED_EPOCHS:
         raise ValueError("Phase 4C requires exactly 10 epochs")
     schedule = []
@@ -37,19 +43,27 @@ def build_epoch_schedule(
                 }
             )
     counts = Counter(item["sample_id"] for item in schedule)
-    if len(schedule) != EXPECTED_STEPS or set(counts.values()) != {epochs}:
-        raise RuntimeError(f"invalid Phase 4C schedule counts: {counts}")
+    expected_steps = expected_sample_count * epochs
+    if len(schedule) != expected_steps or set(counts.values()) != {epochs}:
+        raise RuntimeError(f"invalid projection-training schedule counts: {counts}")
     return schedule
 
 
-def select_gallery_sample_ids(annotations: Sequence[dict[str, Any]]) -> list[str]:
+def select_gallery_sample_ids(
+    annotations: Sequence[dict[str, Any]], *, expected_per_group: int = 2
+) -> list[str]:
     groups: dict[tuple[str, str], list[str]] = defaultdict(list)
     for row in annotations:
         groups[(row["chart_type"], row["referring_type"])].append(
             row["sample_id"]
         )
-    if len(groups) != 16 or any(len(ids) != 2 for ids in groups.values()):
-        raise ValueError("gallery selection requires 16 groups with two samples each")
+    if len(groups) != 16 or any(
+        len(ids) != expected_per_group for ids in groups.values()
+    ):
+        raise ValueError(
+            "gallery selection requires 16 groups with "
+            f"{expected_per_group} samples each"
+        )
     return [min(groups[group]) for group in sorted(groups)]
 
 
@@ -90,17 +104,29 @@ def summarize_overfit_rows(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return {"checkpoints": summaries, "best_checkpoint": best}
 
 
-def summarize_checkpoint_rows(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
-    if len(rows) != EXPECTED_SAMPLE_COUNT:
-        raise ValueError("each Phase 4C checkpoint requires exactly 32 rows")
+def summarize_checkpoint_rows(
+    rows: Sequence[dict[str, Any]],
+    *,
+    expected_sample_count: int = EXPECTED_SAMPLE_COUNT,
+    expected_per_group: int = 2,
+) -> dict[str, Any]:
+    if len(rows) != expected_sample_count:
+        raise ValueError(
+            f"each checkpoint requires exactly {expected_sample_count} rows"
+        )
     ids = [row["sample_id"] for row in rows]
-    if len(set(ids)) != EXPECTED_SAMPLE_COUNT:
+    if len(set(ids)) != expected_sample_count:
         raise ValueError("each sample must appear exactly once per checkpoint")
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         groups[f"{row['chart_type']}/{row['referring_type']}"].append(row)
-    if len(groups) != 16 or any(len(items) != 2 for items in groups.values()):
-        raise ValueError("checkpoint metrics require 16 groups with two samples each")
+    if len(groups) != 16 or any(
+        len(items) != expected_per_group for items in groups.values()
+    ):
+        raise ValueError(
+            "checkpoint metrics require 16 groups with "
+            f"{expected_per_group} samples each"
+        )
     group_metrics = {}
     for name, items in sorted(groups.items()):
         group_metrics[name] = {
@@ -126,11 +152,14 @@ def summarize_checkpoint_rows(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "micro_iou": float(intersection / union) if union else 1.0,
         "micro_dice": float(2 * intersection / (pred + gt)) if pred + gt else 1.0,
         "empty_rate": float(np.mean([row["empty_prediction"] for row in rows])),
+        "empty_count": sum(bool(row["empty_prediction"]) for row in rows),
+        "nonempty_count": sum(not bool(row["empty_prediction"]) for row in rows),
         "nonempty_disjoint_rate": float(
             np.mean([row["nonempty_disjoint"] for row in rows])
         ),
         "overlap_rate": float(
             np.mean([row["overlapping_prediction"] for row in rows])
         ),
+        "overlap_count": sum(bool(row["overlapping_prediction"]) for row in rows),
         "groups": group_metrics,
     }

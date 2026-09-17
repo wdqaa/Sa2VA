@@ -2,11 +2,11 @@
 
 ChartGround-Edit 是基于 Sa2VA 的科学图表自然语言指代分割与可控编辑子项目。输入图表和指令，模型定位被指代的曲线、柱体、散点或置信区间等元素并输出 mask；编辑模块再用该 mask 执行 `highlight`、`recolor`、`extract` 或 `remove`。
 
-当前状态：Phase 1–3C、Phase 4A/4B 和 Phase 4C overfit32 已完成。P2
-`target_only_zh` 保持冻结；真实 Sa2VA-InternVL3-2B 仅训练 `text_hidden_fcs`，在固定
-32 条 train 样本上完成 320 steps。训练集 16-group Macro IoU 从 `0.164664` 提升至
-`0.569468`，empty rate 从 `43.75%` 降至 `0%`，通过 projection-only learnability
-门槛。该结果不是泛化指标；尚未运行完整训练。
+当前状态：Phase 1–3C、Phase 4A–4C 和 Phase 5A 已完成。P2 `target_only_zh` 保持
+冻结；真实 Sa2VA-InternVL3-2B 仅训练 `text_hidden_fcs`，在完整 192 条 train 上完成
+1920 steps。固定 64 条 val 按预注册规则选择 step960：16-group Macro IoU 从
+zero-shot `0.182199` 提升至 `0.426042`，empty rate 从 `43.75%` 降至 `0%`。本阶段
+没有访问 test；最终 fine-tuned test 尚未运行。
 
 ## MVP
 
@@ -371,6 +371,17 @@ baseline 为 `0.164664`；best 为 step320。生产 backend 的可选 projection
 checkpoint 和 mask 留在 `/tmp`；紧凑指标与确定性 16-group gallery 见
 [`docs/phase4c_overfit32_results.md`](docs/phase4c_overfit32_results.md) 和
 [`assets/phase4c_overfit32_gallery.png`](assets/phase4c_overfit32_gallery.png)。
+
+## Phase 5A：完整 train 与 val checkpoint 选择
+
+复用 Phase 4C 的 strategy-A runner 和 strict projection loader，在全部 192 条 train 上
+固定训练 10 epoch/1920 steps；保存 step192/576/960/1344/1920。只在 64 条 val 上
+顺序评测 zero-shot 与五份 checkpoint，按 16-group Macro IoU 选择 step960。各 checkpoint
+Macro IoU 为 `0.182199 / 0.265243 / 0.385975 / 0.426042 / 0.417203 / 0.406564`。
+详细 loss、分组指标和选择边界见
+[`docs/phase5a_full_train_results.md`](docs/phase5a_full_train_results.md)。
+
+![Phase 5A val gallery](assets/phase5a_full_train_val_gallery.png)
 
 ## 开发路线
 

@@ -18,7 +18,7 @@ from .alignment import (
     select_supervised_seg_tokens,
     validate_strict_one_to_one,
 )
-from .data_adapter import Phase4TrainDataset
+from .data_adapter import Phase4TrainDataset, Phase5SplitDataset
 
 
 class ChartGroundPhase4Dataset(Sa2VABaseDataset):
@@ -27,9 +27,10 @@ class ChartGroundPhase4Dataset(Sa2VABaseDataset):
     def __init__(
         self,
         manifest_path: str | Path,
-        selection_path: str | Path,
+        selection_path: str | Path | None,
         tokenizer,
         prompt_template,
+        split: str = "train",
         special_tokens=None,
         extra_image_processor=None,
         max_length: int = 8192,
@@ -37,7 +38,11 @@ class ChartGroundPhase4Dataset(Sa2VABaseDataset):
         single_image_mode: bool = False,
         **kwargs: Any,
     ) -> None:
-        self.source = Phase4TrainDataset(manifest_path, selection_path)
+        self.source = (
+            Phase4TrainDataset(manifest_path, selection_path)
+            if selection_path is not None
+            else Phase5SplitDataset(manifest_path, split=split)
+        )
         self.single_image_mode = single_image_mode
         super().__init__(
             tokenizer=tokenizer,
@@ -131,4 +136,3 @@ def chartground_sa2va_collect_fn(
         object_count_policy=object_count_policy,
     )
     return batch
-

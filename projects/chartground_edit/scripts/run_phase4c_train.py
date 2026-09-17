@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the fixed 320-step Phase 4C projection-only training experiment."""
+"""Run a fixed strategy-A projection-only training experiment."""
 
 from __future__ import annotations
 
@@ -103,20 +103,26 @@ def run(args: argparse.Namespace) -> dict:
     os.environ["CHARTGROUND_SA2VA_HF_REVISION"] = args.sa2va_hf_revision
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     cfg = Config.fromfile(args.config)
+    experiment_name = str(cfg.get("experiment_name", "phase4c_overfit32"))
+    expected_samples = int(cfg.get("expected_train_samples", 32))
+    epochs = int(cfg.get("training_epochs", cfg.get("phase4c_epochs", 10)))
     if (
-        cfg.max_iters != 320
-        or cfg.phase4c_epochs != 10
+        cfg.max_iters != expected_samples * epochs
+        or epochs != 10
         or cfg.train_dataloader.batch_size != 1
         or cfg.optim_wrapper.accumulative_counts != 1
     ):
-        raise ValueError("invalid fixed Phase 4C step/batch/epoch contract")
+        raise ValueError("invalid fixed projection-training step/batch/epoch contract")
     if cfg.val_cfg is not None or cfg.test_cfg is not None or cfg.resume:
-        raise ValueError("Phase 4C must disable val/test/resume")
+        raise ValueError("projection training must disable val/test/resume")
 
     dataset = BUILDER.build(cfg.train_dataloader.dataset)
     sample_ids = [dataset.source[index].sample_id for index in range(len(dataset))]
     schedule = build_epoch_schedule(
-        sample_ids, epochs=cfg.phase4c_epochs, seed=cfg.randomness.seed
+        sample_ids,
+        epochs=epochs,
+        seed=cfg.randomness.seed,
+        expected_sample_count=expected_samples,
     )
     instances = [dataset.prepare_data(index) for index in range(len(dataset))]
     for instance in instances:
@@ -156,7 +162,8 @@ def run(args: argparse.Namespace) -> dict:
 
     common_metadata = {
         **dict(cfg.alignment_metadata),
-        "protocol_version": "phase4c-overfit32-v1",
+        "protocol_version": str(cfg.alignment_metadata["protocol_version"]),
+        "experiment_name": experiment_name,
         "base_checkpoint": {
             "repo_id": args.base_repo_id,
             "revision": args.base_revision,
@@ -171,8 +178,10 @@ def run(args: argparse.Namespace) -> dict:
         "prompt_registry_sha256": (
             "dc822a33b84b1cdfb72f84bd5288f0ebb37626980496107c5e30d4c4c26217c0"
         ),
-        "selection_path": cfg.train_dataloader.dataset.selection_path,
-        "epochs": cfg.phase4c_epochs,
+        "selection_path": cfg.train_dataloader.dataset.get("selection_path"),
+        "training_split": cfg.train_dataloader.dataset.get("split", "train"),
+        "expected_train_samples": expected_samples,
+        "epochs": epochs,
         "max_iters": cfg.max_iters,
         "seed": cfg.randomness.seed,
         "optimizer": {
@@ -184,6 +193,7 @@ def run(args: argparse.Namespace) -> dict:
         },
     }
     checkpoint_paths = {}
+    step_records = []
     started = time.perf_counter()
     with log_path.open("x", encoding="utf-8") as log_stream:
         for item in schedule:
@@ -245,7 +255,8 @@ def run(args: argparse.Namespace) -> dict:
             }
             log_stream.write(json.dumps(record, sort_keys=True) + "\n")
             log_stream.flush()
-            print("PHASE4C_STEP=" + json.dumps(record, sort_keys=True), flush=True)
+            step_records.append(record)
+            print("PROJECTION_TRAIN_STEP=" + json.dumps(record, sort_keys=True), flush=True)
             if item["step"] in cfg.checkpoint_steps:
                 checkpoint = args.output_dir / f"step_{item['step']}.pth"
                 save_projection_checkpoint(
@@ -260,11 +271,52 @@ def run(args: argparse.Namespace) -> dict:
                 }
     total_seconds = time.perf_counter() - started
     counts = Counter(item["sample_id"] for item in schedule)
-    if set(counts.values()) != {10} or len(counts) != 32:
+    if set(counts.values()) != {epochs} or len(counts) != expected_samples:
         raise RuntimeError(f"final sample counts are invalid: {counts}")
+    epoch_summaries = []
+    for epoch in range(1, epochs + 1):
+        epoch_rows = [row for row in step_records if row["epoch"] == epoch]
+        epoch_counts = Counter(row["sample_id"] for row in epoch_rows)
+        if len(epoch_rows) != expected_samples or set(epoch_counts.values()) != {1}:
+            raise RuntimeError(f"epoch {epoch} sample coverage is invalid")
+        epoch_summaries.append(
+            {
+                "epoch": epoch,
+                "step_start": epoch_rows[0]["step"],
+                "step_end": epoch_rows[-1]["step"],
+                "sample_count": len(epoch_rows),
+                "unique_sample_count": len(epoch_counts),
+                "language_loss_mean": float(
+                    np.mean([row["language_loss"] for row in epoch_rows])
+                ),
+                "mask_ce_loss_mean": float(
+                    np.mean([row["mask_ce_loss"] for row in epoch_rows])
+                ),
+                "dice_loss_mean": float(
+                    np.mean([row["dice_loss"] for row in epoch_rows])
+                ),
+                "total_loss_mean": float(
+                    np.mean([row["total_loss"] for row in epoch_rows])
+                ),
+                "min_nonzero_gradient_tensor_count": min(
+                    row["nonzero_gradient_tensor_count"] for row in epoch_rows
+                ),
+                "frozen_parameter_gradient_count": max(
+                    row["frozen_parameter_gradient_count"] for row in epoch_rows
+                ),
+                "peak_allocated_mib": max(
+                    row["peak_allocated_mib"] for row in epoch_rows
+                ),
+                "peak_reserved_mib": max(
+                    row["peak_reserved_mib"] for row in epoch_rows
+                ),
+            }
+        )
     summary = {
+        "experiment_name": experiment_name,
         "completed_steps": len(schedule),
-        "epochs": 10,
+        "epochs": epochs,
+        "epoch_summaries": epoch_summaries,
         "sample_counts": dict(sorted(counts.items())),
         "trainable_parameter_names": trainable_names,
         "trainable_parameter_count": trainable_count,
@@ -279,7 +331,7 @@ def run(args: argparse.Namespace) -> dict:
     (args.output_dir / "train_summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print("PHASE4C_TRAIN_RESULT=" + json.dumps(summary, sort_keys=True))
+    print("PROJECTION_TRAIN_RESULT=" + json.dumps(summary, sort_keys=True))
     return summary
 
 
