@@ -108,7 +108,6 @@ def run(args: argparse.Namespace) -> dict:
     epochs = int(cfg.get("training_epochs", cfg.get("phase4c_epochs", 10)))
     if (
         cfg.max_iters != expected_samples * epochs
-        or epochs != 10
         or cfg.train_dataloader.batch_size != 1
         or cfg.optim_wrapper.accumulative_counts != 1
     ):
@@ -117,20 +116,13 @@ def run(args: argparse.Namespace) -> dict:
         raise ValueError("projection training must disable val/test/resume")
 
     dataset = BUILDER.build(cfg.train_dataloader.dataset)
-    sample_ids = [dataset.source[index].sample_id for index in range(len(dataset))]
+    sample_ids = [record["sample_id"] for record in dataset.source.records]
     schedule = build_epoch_schedule(
         sample_ids,
         epochs=epochs,
         seed=cfg.randomness.seed,
         expected_sample_count=expected_samples,
     )
-    instances = [dataset.prepare_data(index) for index in range(len(dataset))]
-    for instance in instances:
-        batch = chartground_sa2va_collect_fn([instance])
-        record = batch["data"]["alignment_records"][0]
-        if record["supervised_seg_count"] != 1 or record["gt_mask_count"] != 1:
-            raise ValueError(f"alignment preflight failed: {record}")
-
     args.output_dir.mkdir(parents=True)
     log_path = args.output_dir / "train_steps.jsonl"
     _initialize(cfg.randomness.seed)
@@ -198,8 +190,14 @@ def run(args: argparse.Namespace) -> dict:
     with log_path.open("x", encoding="utf-8") as log_stream:
         for item in schedule:
             step_started = time.perf_counter()
-            instance = instances[item["sample_index"]]
+            instance = dataset.prepare_data(item["sample_index"])
             batch = chartground_sa2va_collect_fn([instance])
+            alignment = batch["data"]["alignment_records"][0]
+            if (
+                alignment["supervised_seg_count"] != 1
+                or alignment["gt_mask_count"] != 1
+            ):
+                raise ValueError(f"alignment failed: {alignment}")
             optimizer.zero_grad(set_to_none=True)
             prepared = model.data_preprocessor(batch, True)
             _sync()

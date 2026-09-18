@@ -340,3 +340,15 @@ Phase 5B protocol 未改变。未运行模型、训练、val/test 或新增实�
 - 新用户按 README 能完成不依赖私有路径的最小推理或 mock 演示。
 - 指标、表格和图片均能追溯到 commit、数据版本、模型配置和脚本。
 - 开源包不含权重、大型数据、密钥或许可证不允许再分发的内容。
+
+## Phase 7：synthetic_v2 parameter-efficient adaptation
+
+### Phase 7A 实际状态（2026-09-18）
+
+已完成唯一一次 synthetic_v2 Strategy A 训练：仅更新 2,754,304 个
+`text_hidden_fcs` 参数，960 条 train × 5 epoch，共 4,800/4,800 steps；未访问 test。
+训练后在固定 320 条 val 上公平比较 zero-shot、v1 step960 迁移和五个 v2 checkpoint，
+按预注册规则选择 step4800。其 16-group Macro IoU 为 `0.210365`，相对 zero-shot
+提高 `0.112790`，15/16 组提升，empty rate 为 `4.0625%`；相对 v1 step960 迁移仅
+提高 `0.031550`，未达到预注册的 `0.05` 门槛。下一阶段可单独预注册小型 LoRA
+Strategy B 消融，但不得据本次 val 结果重跑或调整 Strategy A。

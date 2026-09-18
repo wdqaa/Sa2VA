@@ -12,11 +12,15 @@ import numpy as np
 from PIL import Image
 
 from ..datasets.schema_v1 import validate_jsonl_v1
+from ..datasets.schema_v2 import validate_annotation_v2
 from ..inference.prompt_variants import TARGET_ONLY_ZH, build_prompt_variant
 
 
 EXPECTED_MANIFEST_SHA256 = (
     "ebad55fd98356204e572ffe6607a16a34c9dde8a916a9977a7f08bc4aed2ba82"
+)
+EXPECTED_V2_MANIFEST_SHA256 = (
+    "1815d127d9104db1e1d91d2dddd8080c099a4f84d922896f655910adca2154be"
 )
 ASSISTANT_TARGET = "Sure, [SEG]."
 AUDIT_ONLY_FIELDS = frozenset(
@@ -142,6 +146,57 @@ class Phase5SplitDataset(Sequence[Phase4DataSample]):
             raise ValueError(
                 f"Phase 5A {split} requires {expected} samples, got {len(self.records)}"
             )
+        self.split = split
+
+    def __len__(self) -> int:
+        return len(self.records)
+
+    def __getitem__(self, index: int | slice) -> Phase4DataSample | list[Phase4DataSample]:
+        if isinstance(index, slice):
+            return [self[item] for item in range(*index.indices(len(self)))]
+        return _load_sample(self.manifest_path, self.records[index])
+
+
+class Phase7V2SplitDataset(Sequence[Phase4DataSample]):
+    """Read only the frozen synthetic_v2 train or val split.
+
+    Test annotations are discarded immediately after parsing their split field;
+    their image and mask paths are never opened or retained.
+    """
+
+    _EXPECTED_COUNTS = {"train": 960, "val": 320}
+
+    def __init__(self, manifest_path: str | Path, *, split: str):
+        self.manifest_path = Path(manifest_path)
+        if split == "test":
+            raise ValueError("synthetic_v2 test is frozen and forbidden in Phase 7A")
+        if split not in self._EXPECTED_COUNTS:
+            raise ValueError("Phase 7A split must be exactly 'train' or 'val'")
+        manifest_hash = file_sha256(self.manifest_path)
+        if manifest_hash != EXPECTED_V2_MANIFEST_SHA256:
+            raise ValueError(
+                "synthetic_v2 manifest SHA-256 mismatch: "
+                f"expected {EXPECTED_V2_MANIFEST_SHA256}, got {manifest_hash}"
+            )
+        records: list[dict[str, Any]] = []
+        with self.manifest_path.open("r", encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, start=1):
+                record = json.loads(line)
+                if record.get("split") != split:
+                    continue
+                try:
+                    validate_annotation_v2(
+                        record, base_dir=self.manifest_path.parent, check_files=True
+                    )
+                except ValueError as exc:
+                    raise ValueError(f"line {line_number}: {exc}") from exc
+                records.append(record)
+        expected = self._EXPECTED_COUNTS[split]
+        if len(records) != expected:
+            raise ValueError(
+                f"Phase 7A {split} requires {expected} samples, got {len(records)}"
+            )
+        self.records = records
         self.split = split
 
     def __len__(self) -> int:

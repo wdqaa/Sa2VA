@@ -1,5 +1,17 @@
 # ChartGround-Edit 实验记录
 
+## 2026-09-18 Phase 7A synthetic_v2 projection-only train / val
+
+- 分支与基线：`experiment/synthetic-v2-peft`，基线 commit `0728d45`；开始时工作区 clean，synthetic_v2 manifest SHA-256 为 `1815d127d9104db1e1d91d2dddd8080c099a4f84d922896f655910adca2154be`
+- 数据边界：正式训练只读 synthetic_v2 train 960 条，validation 只读 val 320 条；未访问 synthetic_v2 test，未修改 v1/v2、P2 或历史结果
+- 配置：原始 Sa2VA full PTH 初始化，Strategy A 只训练 `text_hidden_fcs.{0.weight,0.bias,2.weight,2.bias}` 共 2,754,304 参数；BF16、batch/accumulation `1/1`、AdamW lr `4e-5`、weight decay `0.05`、240-step warmup + cosine、5 epoch/4,800 steps、seed `20260916`
+- smoke：固定 train 样本 `cgev2_line_category_1609c9161fd4`，supervised `[SEG]`/GT mask=`1/1`；loss 均 finite，gradient norm `10.727626`，4/4 tensor 有非零梯度，冻结梯度 0，step 后 2,754,304 个参数元素发生变化；strict projection save/reload 完全一致；peak allocated/reserved `5924.7/6142.0 MiB`
+- 正式训练：4,800/4,800 steps 完成，每个 train ID 恰好出现 5 次；epoch 1→5 的 mask CE `0.503174→0.366617`、Dice `0.377092→0.312231`、total `1.152409→0.951032`；训练循环 `2043.7s`，peak allocated/reserved `9269.4/12048.0 MiB`；无 OOM、无重试
+- validation：模型只加载一次，依次严格切换原始 projection、v1 step960 和 v2 step960/1920/2880/3840/4800；恢复原始 projection 后 sentinel mask hash 完全一致；七路各 320 条
+- 16-group Macro IoU：zero-shot `0.097575`，v1 step960 `0.178815`，v2 step960/1920/2880/3840/4800 为 `0.174547/0.138563/0.165129/0.203185/0.210365`
+- selected：按预注册 Macro IoU → Macro Dice → Micro IoU → earlier 规则选择 `step4800`；Macro Dice `0.292119`，Micro IoU/Dice `0.296622/0.457530`，empty `4.0625%`
+- 判定：相对 zero-shot `+0.112790`、15/16 组合提升，满足三项门槛；相对 v1 step960 仅 `+0.031550`，未达到 `+0.05`，因此四项预注册门槛未全部通过。Strategy A 有效但增益有限，值得另行开展受控的小型 LoRA Strategy B；本阶段未启动 LoRA 或第二次训练
+
 ## 2026-09-18 Phase 5B saved-output visualization / synthetic_v2
 
 - 分支与基线：`experiment/synthetic-v2-peft`，基线为 Phase 6A commit `a5278fd`；开始时工作区 clean

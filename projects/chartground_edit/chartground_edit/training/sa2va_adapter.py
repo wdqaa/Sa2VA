@@ -18,7 +18,7 @@ from .alignment import (
     select_supervised_seg_tokens,
     validate_strict_one_to_one,
 )
-from .data_adapter import Phase4TrainDataset, Phase5SplitDataset
+from .data_adapter import Phase4TrainDataset, Phase5SplitDataset, Phase7V2SplitDataset
 
 
 class ChartGroundPhase4Dataset(Sa2VABaseDataset):
@@ -31,6 +31,7 @@ class ChartGroundPhase4Dataset(Sa2VABaseDataset):
         tokenizer,
         prompt_template,
         split: str = "train",
+        dataset_protocol: str = "synthetic_v1",
         special_tokens=None,
         extra_image_processor=None,
         max_length: int = 8192,
@@ -38,11 +39,16 @@ class ChartGroundPhase4Dataset(Sa2VABaseDataset):
         single_image_mode: bool = False,
         **kwargs: Any,
     ) -> None:
-        self.source = (
-            Phase4TrainDataset(manifest_path, selection_path)
-            if selection_path is not None
-            else Phase5SplitDataset(manifest_path, split=split)
-        )
+        if selection_path is not None:
+            if dataset_protocol != "synthetic_v1":
+                raise ValueError("ID selections are only supported for synthetic_v1")
+            self.source = Phase4TrainDataset(manifest_path, selection_path)
+        elif dataset_protocol == "synthetic_v1":
+            self.source = Phase5SplitDataset(manifest_path, split=split)
+        elif dataset_protocol == "synthetic_v2":
+            self.source = Phase7V2SplitDataset(manifest_path, split=split)
+        else:
+            raise ValueError(f"unsupported dataset protocol: {dataset_protocol!r}")
         self.single_image_mode = single_image_mode
         super().__init__(
             tokenizer=tokenizer,

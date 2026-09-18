@@ -160,6 +160,14 @@ projects/sa2va/.venv/bin/python \
 完整分布、难度定义和 v1/v2 对比见
 [synthetic_v2 data card](docs/synthetic_v2_data_card.md)。
 
+### synthetic_v2 projection-only baseline
+
+Phase 7A 使用原始 Sa2VA projection 初始化，只训练 2.75M 个 `text_hidden_fcs`
+参数，在 synthetic_v2 的 960 条 train 上完成 5 epoch，并且只在 320 条 val 上
+选择 checkpoint。step4800 的 16-group Macro IoU 为 `0.210365`，zero-shot 为
+`0.097575`，v1 step960 迁移为 `0.178815`；详细训练曲线、分组指标和限制见
+[Phase 7A results](docs/phase7a_v2_projection_results.md)。synthetic_v2 test 未访问。
+
 ## 训练复现
 
 训练需要 base InternVL3-2B 与由官方 `tools/convert_to_pth.py` 生成的 Sa2VA full

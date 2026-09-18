@@ -28,8 +28,8 @@ def build_epoch_schedule(
         raise ValueError(
             f"projection training requires {expected_sample_count} unique sample IDs"
         )
-    if epochs != EXPECTED_EPOCHS:
-        raise ValueError("Phase 4C requires exactly 10 epochs")
+    if type(epochs) is not int or epochs <= 0:
+        raise ValueError("projection training epochs must be a positive integer")
     schedule = []
     for epoch_index in range(epochs):
         generator = torch.Generator().manual_seed(seed + epoch_index)

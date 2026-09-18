@@ -152,8 +152,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "chartground_mpl")
     )
     cfg = Config.fromfile(args.config)
-    if cfg.train_cfg.max_iters != 1 or cfg.train_dataloader.batch_size != 1:
-        raise ValueError("Phase 4B smoke config must be exactly one sample/iteration")
+    smoke_steps = int(cfg.get("smoke_optimizer_steps", cfg.train_cfg.max_iters))
+    if smoke_steps != 1 or cfg.train_dataloader.batch_size != 1:
+        raise ValueError("smoke run must authorize exactly one sample/iteration")
     if cfg.val_cfg is not None or cfg.test_cfg is not None or cfg.resume:
         raise ValueError("Phase 4B smoke config must disable val/test/resume")
 
@@ -164,9 +165,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("P2 template hash changed")
 
     dataset = BUILDER.build(cfg.train_dataset)
-    if len(dataset) != 1 or dataset.source[0].sample_id != SMOKE_ID:
-        raise ValueError("smoke1 sample identity changed")
-    instance = dataset.prepare_data(0)
+    smoke_id = str(cfg.get("smoke_sample_id", SMOKE_ID))
+    matching = [
+        index
+        for index, record in enumerate(dataset.source.records)
+        if record["sample_id"] == smoke_id
+    ]
+    if len(matching) != 1:
+        raise ValueError(f"smoke sample identity is missing or duplicated: {smoke_id}")
+    instance = dataset.prepare_data(matching[0])
     batch = chartground_sa2va_collect_fn(
         [instance],
         ignore_index=cfg.model.ignore_index,
@@ -174,15 +181,17 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         expected_masks_per_sample=cfg.model.expected_masks_per_sample,
     )
     alignment_records = batch["data"]["alignment_records"]
-    if alignment_records != [
-        {
-            "sample_id": SMOKE_ID,
-            "supervised_seg_count": 1,
-            "gt_mask_count": 1,
-            "token_positions": [1840],
-            "object_count_policy": "strict_one_to_one",
-        }
-    ]:
+    expected_positions = cfg.get("smoke_expected_token_positions", [1840])
+    expected_alignment = {
+        "sample_id": smoke_id,
+        "supervised_seg_count": 1,
+        "gt_mask_count": 1,
+        "token_positions": alignment_records[0]["token_positions"],
+        "object_count_policy": "strict_one_to_one",
+    }
+    if expected_positions is not None:
+        expected_alignment["token_positions"] = list(expected_positions)
+    if alignment_records != [expected_alignment]:
         raise ValueError(f"unexpected smoke1 alignment record: {alignment_records}")
 
     _initialize_runtime(cfg.randomness.seed)
@@ -276,7 +285,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "source_hf_revision": args.sa2va_hf_revision,
         },
         "prompt_registry_sha256": PROMPT_REGISTRY_SHA256,
-        "smoke_sample_id": SMOKE_ID,
+        "smoke_sample_id": smoke_id,
         "optimizer_step": 1,
     }
     save_projection_checkpoint(model, args.output, checkpoint_metadata)
@@ -307,7 +316,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise RuntimeError("projection checkpoint reload verification failed")
 
     report = {
-        "sample_id": SMOKE_ID,
+        "sample_id": smoke_id,
         "base_repo_id": args.base_repo_id,
         "base_revision": args.base_revision,
         "base_model_path": str(args.base_model),
