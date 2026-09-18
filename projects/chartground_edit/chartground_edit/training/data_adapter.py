@@ -158,20 +158,28 @@ class Phase5SplitDataset(Sequence[Phase4DataSample]):
 
 
 class Phase7V2SplitDataset(Sequence[Phase4DataSample]):
-    """Read only the frozen synthetic_v2 train or val split.
+    """Read a frozen synthetic_v2 split with test access default-denied.
 
     Test annotations are discarded immediately after parsing their split field;
-    their image and mask paths are never opened or retained.
+    their image and mask paths are never opened or retained unless a frozen-test
+    runner explicitly opts in with ``allow_test=True``.
     """
 
-    _EXPECTED_COUNTS = {"train": 960, "val": 320}
+    _EXPECTED_COUNTS = {"train": 960, "val": 320, "test": 320}
 
-    def __init__(self, manifest_path: str | Path, *, split: str):
+    def __init__(
+        self, manifest_path: str | Path, *, split: str, allow_test: bool = False
+    ):
         self.manifest_path = Path(manifest_path)
-        if split == "test":
-            raise ValueError("synthetic_v2 test is frozen and forbidden in Phase 7A")
+        if type(allow_test) is not bool:
+            raise TypeError("allow_test must be a boolean")
+        if split == "test" and not allow_test:
+            raise ValueError(
+                "synthetic_v2 test is frozen and forbidden by default; "
+                "explicit frozen-test access is required"
+            )
         if split not in self._EXPECTED_COUNTS:
-            raise ValueError("Phase 7A split must be exactly 'train' or 'val'")
+            raise ValueError("synthetic_v2 split must be train, val, or test")
         manifest_hash = file_sha256(self.manifest_path)
         if manifest_hash != EXPECTED_V2_MANIFEST_SHA256:
             raise ValueError(
@@ -194,7 +202,7 @@ class Phase7V2SplitDataset(Sequence[Phase4DataSample]):
         expected = self._EXPECTED_COUNTS[split]
         if len(records) != expected:
             raise ValueError(
-                f"Phase 7A {split} requires {expected} samples, got {len(records)}"
+                f"synthetic_v2 {split} requires {expected} samples, got {len(records)}"
             )
         self.records = records
         self.split = split

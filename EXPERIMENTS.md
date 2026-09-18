@@ -1,5 +1,21 @@
 # ChartGround-Edit 实验记录
 
+## 2026-09-19 Phase 7C synthetic_v2 frozen test / A-B ablation
+
+- 冻结身份：protocol commit `de3b45f`，文件 SHA-256 `c7e82d6c7377eb1d4ae38a8051f73acfac13278c1ea93e7ebf4a0c69c90dcc22`；manifest SHA-256 `1815d127d9104db1e1d91d2dddd8080c099a4f84d922896f655910adca2154be`；P2 `target_only_zh`
+- checkpoint：v1 projection `64c0d109…791f41e`，v2 Strategy A `6c8f30d2…9eab3c4`，v2 Strategy B `c47ce4e3…e475b97`；B 恰含 4 个 projection 与 64 个 LoRA tensor，step=4800
+- 运行边界：一个 Sa2VA-InternVL3-2B BF16 模型进程，固定 zero-shot → v1 → v2-A → v2-B；synthetic_v2 test 320 条每状态各一次，共 1,280/1,280 次 `predict_forward`；没有训练、train/val 推理、成功样本重试、阈值调整或 checkpoint 重选
+- 完整性：四状态 execution success、mask contract 和 `[SEG]` 均为 320/320；切换后原始 projection 精确恢复、LoRA 禁用，sentinel 保存 mask hash 一致，额外 inference call=0；protocol 前后 hash 相同
+- 主要指标（16-group Macro IoU/Dice）：zero-shot `0.081553/0.125826`，v1 step960 `0.192929/0.281413`，v2-A `0.231966/0.318796`，v2-B `0.294018/0.386910`
+- 其他 B 指标：Micro IoU/Dice `0.398550/0.569948`，empty/overlap/nonempty-disjoint `1.5625%/92.8125%/5.6250%`，median IoU/Dice `0.228814/0.372337`
+- 固定比较：B−zero Macro IoU/Dice `+0.212465/+0.261084`；B−A `+0.062052/+0.068114`；A−v1 `+0.039037/+0.037383`；B 对 zero-shot 为 16/16 组提升，对 A 为 15/16 组提升
+- paired group bootstrap（seed `20260916`，10,000 次）：B−zero IoU/Dice 95% CI `[0.165020,0.261090]` / `[0.205629,0.315260]`；B−A `[0.038416,0.088712]` / `[0.040236,0.097902]`；A−v1 `[0.007900,0.071926]` / `[-0.000248,0.075580]`
+- 分组：B−A 在 easy/medium/hard 的 IoU 增益为 `+0.101226/+0.054202/+0.025508`；line/scatter/confidence-band trend 为 `+0.039534/+0.069238/+0.198914`；唯一下降为 line/category `-0.007032`
+- 编辑与失败：B 非空 315 条全部编辑成功，5 条空预测跳过且未使用 GT；错误分类 boundary/over/partial/under/wrong=`42/94/58/108/18`，IoU<0.5 为 256/320，under-segmentation 是总体和 hard 的主要失败类型
+- 时间/显存：四状态平均 latency `594.831/593.790/594.157/635.532 ms`；PyTorch peak allocated `5204.6 MiB`；无 OOM、无正式 test 重跑
+- 独立复算：1,280 个保存 mask 的二值性、尺寸、hash、前景/交并像素、IoU/Dice 全部一致；四状态 Macro/Micro 聚合与保存 JSON 精确一致；315 个 B 编辑产物齐全
+- 结论：Strategy B 保持由 Phase 7B val 预选的最终策略，在 frozen test 上继续优于 A；项目已具备最终 release 指标与资产更新条件，不启动 Strategy C
+
 ## 2026-09-18 Phase 7B synthetic_v2 small-LLM-LoRA train / val
 
 - 分支与基线：`experiment/synthetic-v2-peft`；Phase 7A 已以 commit `786f1b8` 收口，其 step4800 持久化 SHA-256 为 `6c8f30d20e52b1e0473b8a9bdd69e682c944cbdcf6bed8c0c45f30a399eab3c4`

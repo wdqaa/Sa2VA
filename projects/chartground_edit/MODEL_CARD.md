@@ -42,6 +42,19 @@ The frozen protocol and detailed group results are available in
 [phase5b_finetuned_test_protocol.md](docs/phase5b_finetuned_test_protocol.md)
 and [phase5b_finetuned_test_results.md](docs/phase5b_finetuned_test_results.md).
 
+## Subsequent synthetic_v2 LoRA ablation
+
+A separate experimental Strategy B artifact adds rank-16 LoRA to the last eight
+LLM attention layers while retaining the four projection tensors (3,999,488
+trainable parameters total). It was selected on synthetic_v2 validation before
+one frozen 320-sample test. Its test Macro IoU/Dice is `0.294018/0.386910`,
+versus `0.231966/0.318796` for projection-only Strategy A and
+`0.081553/0.125826` for zero-shot. This does not replace or alter the v1
+projection-only checkpoint documented above. The separate Strategy B artifact
+has SHA-256 `c47ce4e38a9b1679c766d6360d66b6a3b69286d36b9d7cde50c70991ae475b97`.
+See
+[phase7c_v2_frozen_test_results.md](docs/phase7c_v2_frozen_test_results.md).
+
 ## Loading and inference
 
 The checkpoint must be loaded together with the matching Sa2VA HF model. The

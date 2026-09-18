@@ -9,7 +9,7 @@ ChartGround-Edit 是基于 Sa2VA-InternVL3-2B 的科学图表指代分割与可�
 - 自然语言指代分割与细粒度图表图元定位
 - 完整的 predicted-mask 编辑闭环，不使用 GT mask 修正预测
 - 覆盖 16 个 chart/referring 组合的 balanced synthetic benchmark
-- 只更新 2,754,304 个 projection 参数的 parameter-efficient tuning
+- projection-only tuning 与受控的小型 LLM LoRA 消融
 - 严格的 train/val/test 隔离、预注册 checkpoint 选择和一次性 frozen test
 - 可复现的数据生成、对齐审计、训练、指标聚合和无 GT Demo CLI
 
@@ -26,19 +26,21 @@ flowchart LR
 
     U[User Prompt SEG] -. labels = -100; excluded .-> C
     T[Training] -. only labels != -100 assistant SEG .-> C
-    P[Projection tuning] -. only text_hidden_fcs trainable .-> D
+    P[Strategy A projection tuning] -. only text_hidden_fcs trainable .-> D
     Q[Inference] -. loads about 11 MB projection checkpoint .-> D
 ```
 
 训练对齐使用
 `(input_ids == seg_token_idx) AND (labels != -100)`，因此 Prompt 中的用户
 `[SEG]` 不参与 mask 对齐；每个样本严格要求一个 supervised assistant `[SEG]`
-对应一个 GT mask。LLM、vision backbone、InternVL `mlp1` 和 SAM2 均冻结。
+对应一个 GT mask。v1/Strategy A 冻结 LLM、vision backbone、InternVL `mlp1`
+和 SAM2；Strategy B 只额外训练最后 8 个 LLM attention 层的 LoRA。
 
 ## 结果
 
-所有定量结果均来自 Pillow 生成的 `synthetic_v1`，不能解释为真实论文图表上的
-泛化结果。Macro 指标对 16 个 `chart_type × referring_type` 组合等权平均。
+下表定量结果来自 Pillow 生成的 `synthetic_v1`；后文的受控 A/B 消融来自
+`synthetic_v2`。两者都不能解释为真实论文图表上的泛化结果。Macro 指标对 16 个
+`chart_type × referring_type` 组合等权平均。
 
 | 阶段 | split / scope | checkpoint | Macro IoU | Macro Dice | Empty rate |
 |---|---|---|---:|---:|---:|
@@ -166,7 +168,28 @@ Phase 7A 使用原始 Sa2VA projection 初始化，只训练 2.75M 个 `text_hid
 参数，在 synthetic_v2 的 960 条 train 上完成 5 epoch，并且只在 320 条 val 上
 选择 checkpoint。step4800 的 16-group Macro IoU 为 `0.210365`，zero-shot 为
 `0.097575`，v1 step960 迁移为 `0.178815`；详细训练曲线、分组指标和限制见
-[Phase 7A results](docs/phase7a_v2_projection_results.md)。synthetic_v2 test 未访问。
+[Phase 7A results](docs/phase7a_v2_projection_results.md)。Phase 7A 本身未访问
+synthetic_v2 test。
+
+### synthetic_v2 frozen A/B test
+
+Phase 7B 在同一 projection 基础上增加 LLM 最后 8 层 attention q/k/v/o 的 rank-16
+LoRA，总可训练参数为 3,999,488（0.1726%）。它先由固定 320 条 val 预选，再按冻结
+protocol 在 320 条 test 上与三个固定状态各评测一次；没有根据 test 重新选模型。
+
+| frozen test state | Macro IoU | Macro Dice | Micro IoU | Micro Dice | Empty rate |
+|---|---:|---:|---:|---:|---:|
+| Zero-shot | 0.081553 | 0.125826 | 0.122480 | 0.218231 | 34.3750% |
+| v1 step960 projection | 0.192929 | 0.281413 | 0.239054 | 0.385865 | 0.3125% |
+| v2 Strategy A | 0.231966 | 0.318796 | 0.308443 | 0.471465 | 2.8125% |
+| v2 Strategy B | **0.294018** | **0.386910** | **0.398550** | **0.569948** | **1.5625%** |
+
+B 相对 zero-shot 的 Macro IoU 提升 `+0.212465`，相对 A 提升 `+0.062052`；16 个
+组合中分别提升 16 个和 15 个。详见
+[Phase 7C frozen-test results](docs/phase7c_v2_frozen_test_results.md) 与
+[saved summary](results/phase7c_v2_frozen_test_summary.json)。
+
+![synthetic_v2 frozen-test ablation](assets/phase7c_v2_test_ablation.png)
 
 ## 训练复现
 
@@ -223,7 +246,8 @@ projects/sa2va/.venv/bin/python -m pytest -q projects/chartground_edit/tests
 - 当前定量评测主要基于 Pillow 合成图，未证明真实论文图表上的稳定泛化。
 - Fine-tuned test 的 `bar/appearance` 组仍为 0 IoU。
 - `remove` 是确定性填色或邻域统计替换，不是生成式图像修复。
-- 当前 checkpoint 只更新 projection；LLM、vision encoder 和 SAM2 均未适配。
+- v1 发布 checkpoint 只更新 projection；v2 Strategy B 也只增加小型 LLM LoRA，
+  vision encoder 和 SAM2 均未适配。
 - 暂未覆盖复杂子图、3D 图、热力图、组合图及字符级 OCR 分割。
 
 ## 模型、结果与上游

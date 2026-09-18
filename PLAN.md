@@ -365,3 +365,15 @@ Strategy B 消融，但不得据本次 val 结果重跑或调整 Strategy A。
 `+0.063034/+0.072073`，empty rate 从 `4.0625%` 降至 `1.25%`。三项预注册
 简约选择条件全部通过，因此保留 Strategy B。下一主线是持久化并冻结
 B step4800，随后只做一次 synthetic_v2 frozen test；不需要先开启 Strategy C。
+
+### Phase 7C 实际状态（2026-09-19）
+
+已按提交前冻结的 protocol 完成 synthetic_v2 唯一一次 frozen test。在同一模型进程中
+固定依次评测 zero-shot、v1 step960、v2 Strategy A step4800 和由 val 预选的
+Strategy B step4800，四个状态各 320 次、共恰好 1,280 次 backend call；没有训练、
+重试、threshold tuning 或 train/val 推理。16-group Macro IoU/Dice 分别为
+`0.081553/0.125826`、`0.192929/0.281413`、`0.231966/0.318796` 和
+`0.294018/0.386910`。B 相对 zero-shot 的 Macro IoU 提升 `+0.212465`，相对 A
+提升 `+0.062052`；B 对 zero-shot 为 16/16 组提升，对 A 为 15/16 组提升。
+Strategy B 仍是由 val 预先选择的最终策略，没有根据 test 重新选择。完整 mask、指标、
+编辑与恢复状态均已离线复核；下一阶段仅应做最终 release 更新，不再开启 Strategy C。
