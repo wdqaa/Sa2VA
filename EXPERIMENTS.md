@@ -1,5 +1,20 @@
 # ChartGround-Edit 实验记录
 
+## 2026-09-18 Phase 5B saved-output visualization / synthetic_v2
+
+- 分支与基线：`experiment/synthetic-v2-peft`，基线为 Phase 6A commit `a5278fd`；开始时工作区 clean
+- 模型运行：未加载模型、未运行推理/训练、未访问 GPU；Phase 3/4/5 JSON、JSONL、指标、checkpoint 与 synthetic_v1 均未修改
+- Phase 5B 可视化：只读冻结目录的 64 条 original/GT/predicted/edited artifact；四类定量图按每组最小 sample ID 选取，产品图按固定 action/chart/referring tuple 选取，失败图按 IoU/Dice/sample ID 选取最低 6 条；TP/FP/FN 为绿/红/蓝
+- 错误分类：64 条按保存 mask 的确定性规则为 over-segmentation 24、under-segmentation 17、boundary error 12、wrong series 6、partial target 5；IoU<0.5 的 40 条分别为 14/5/10/6/5；最低 6 条均为 wrong series
+- synthetic_v2：schema `chartground-edit-v2`、generator `synthetic-v2.0.0`、seed `20260917`；1,600 条，train/val/test=`960/320/320`；16 组合各 100，组合内 split=`60/20/20`，四 action 分别为 `15/5/5`
+- 多样性：5 种画布/宽高比、5 DPI、5 legend 位置、light/dark、3 grid、3 layout、3 axis-scale、4 numeric format、多字体/字号、交叉与遮挡、JPEG/blur/screenshot/antialias；difficulty 由八因素 proxy 分层，与 distractor count 独立
+- audit：1,600/1,600 schema/mask 通过，semantic error 0；image/mask 精确重复 0；跨 v1 精确重复 0；style/template/data-signature 跨 split 泄漏 0；action-only 跨 split重复 0；联合 dHash+RGB histogram+edge+target-mask+foreground/aspect 近重复候选 0
+- v1/v2：画布尺寸 `1→5`，宽高比 `1.5→0.8–2.0`，series `3–5→2–6`，legend `right→5 positions`，theme `light→light/dark`；within-set sampled dHash median `0.21875→0.484375`
+- 本地生成物：`projects/chartground_edit/data/synthetic_v2` 约 106 MiB，受 Git ignore 保护；manifest SHA-256 `1815d127d9104db1e1d91d2dddd8080c099a4f84d922896f655910adca2154be`
+- 版本化产物：v2 generator/schema/reader/audit/gallery/test、`docs/synthetic_v2_data_card.md`、`assets/synthetic_v2_gallery.png`、六张 Phase 5B 重排图
+- 验证：新增专项 9/9、ChartGround-Edit 全量 210/210 通过；compileall、Markdown 链接、CLI help、敏感路径/大文件扫描和 `git diff --check` 通过；同 seed 在独立临时目录复生成的 manifest+1,600 images+1,600 masks 共 3,201 个 SHA-256 逐项一致
+- 结论：数据和离线可视化门禁已满足，可进入另行预注册的 A/B/C 训练消融；本轮按要求停止，不启动训练
+
 ## 2026-09-17 Phase 6A release candidate 整理
 
 - 基线：Phase 5B commit `6702c0b`，开始时工作区 clean；本阶段只做文档、公开性、CLI mock/unit test 和静态一致性整理

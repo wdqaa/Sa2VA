@@ -300,6 +300,14 @@ strict projection loader 和既有 editor；本阶段没有根据 test 修改模
 
 ## Phase 6：评测、Demo、README 和开源整理
 
+### synthetic_v2 / saved-output visualization 实际状态（2026-09-18）
+
+在独立分支 `experiment/synthetic-v2-peft` 完成两项不涉及模型的后续工作：从 Phase 5B
+冻结输出离线重建四张定量图、四动作产品图和失败案例图；新增独立 v2 schema 与确定性
+1,600 条生成器，train/val/test=`960/320/320`，16 组合各 100 条、action 精确平衡。
+联合 mask/泄漏/重复 audit 为 0 hard failure，v1 及历史结果未修改。本阶段未训练、推理或
+启动 A/B/C 消融。
+
 ### Phase 6A 实际状态（2026-09-17）
 
 已将 ChartGround-Edit 整理为 release candidate：项目 README 聚焦能力、架构、最终

@@ -55,6 +55,14 @@ test 相对 zero-shot 的 Macro IoU 提升 **+0.2309**，empty rate 从 **42.19%
 
 ![Fine-tuned test: one deterministic sample from each of 16 groups](assets/phase5b_finetuned_test_gallery.png)
 
+Phase 5B 的可读版定量图完全由冻结的已保存 mask 重建，没有重跑模型。四类图分别见
+[line](assets/phase5b_eval_line.png)、[bar](assets/phase5b_eval_bar.png)、
+[scatter](assets/phase5b_eval_scatter.png) 和
+[confidence band](assets/phase5b_eval_confidence_band.png)；同时保留
+[确定性最差案例](assets/phase5b_failure_cases.png)。
+
+![Selected qualitative examples; remove uses deterministic fill](assets/chartground_edit_demo_gallery.png)
+
 编辑器也可独立使用 GT 或外部 mask 做像素级验证：
 
 ![Deterministic mask editing operations](assets/editing_v0_gallery.png)
@@ -131,6 +139,26 @@ projects/sa2va/.venv/bin/python \
 [jsonl_schema_v1.md](docs/jsonl_schema_v1.md)、
 [data_card_synthetic_v1.md](docs/data_card_synthetic_v1.md) 和
 [synthetic_v1_audit.md](docs/synthetic_v1_audit.md)。
+
+视觉分布更丰富的 `synthetic_v2` 共 1,600 条，train/val/test=`960/320/320`，
+每个 chart/referring 组合 100 条且 action 精确平衡；它使用独立 v2 schema，不修改
+v1。生成与联合重复审计：
+
+```bash
+projects/sa2va/.venv/bin/python \
+  projects/chartground_edit/scripts/generate_synthetic_v2.py \
+  --output-dir <V2_DATA_DIR> --seed 20260917 --clean \
+  --gallery-output <OUTPUT_DIR>/synthetic_v2_gallery.png
+
+projects/sa2va/.venv/bin/python \
+  projects/chartground_edit/scripts/audit_synthetic_v2.py \
+  --manifest <V2_DATA_DIR>/annotations.jsonl \
+  --v1-manifest <V1_DATA_DIR>/annotations.jsonl \
+  --output-json <OUTPUT_DIR>/synthetic_v2_audit.json
+```
+
+完整分布、难度定义和 v1/v2 对比见
+[synthetic_v2 data card](docs/synthetic_v2_data_card.md)。
 
 ## 训练复现
 
