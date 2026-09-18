@@ -352,3 +352,16 @@ Phase 5B protocol 未改变。未运行模型、训练、val/test 或新增实�
 提高 `0.112790`，15/16 组提升，empty rate 为 `4.0625%`；相对 v1 step960 迁移仅
 提高 `0.031550`，未达到预注册的 `0.05` 门槛。下一阶段可单独预注册小型 LoRA
 Strategy B 消融，但不得据本次 val 结果重跑或调整 Strategy A。
+
+### Phase 7B 实际状态（2026-09-18）
+
+已完成唯一一次固定 Strategy B：从原始 Sa2VA full PTH 初始化，同时
+训练 2,754,304 个 projection 参数和 LLM 最后 8 层 attention q/k/v/o 的
+1,245,184 个 rank-16 LoRA 参数，总可训练 3,999,488（0.1726%）。smoke 和
+4,800/4,800 steps 正式训练均通过；960 个 train ID 各出现 5 次，正式
+进程无 OOM，未访问 test。五个 B checkpoint 只在固定 320 条 val 上
+评测，按预注册规则选择 step4800；其 16-group Macro IoU/Dice 为
+`0.273399/0.364193`，相对冻结 Strategy A step4800 提升
+`+0.063034/+0.072073`，empty rate 从 `4.0625%` 降至 `1.25%`。三项预注册
+简约选择条件全部通过，因此保留 Strategy B。下一主线是持久化并冻结
+B step4800，随后只做一次 synthetic_v2 frozen test；不需要先开启 Strategy C。

@@ -1,5 +1,24 @@
 # ChartGround-Edit 实验记录
 
+## 2026-09-18 Phase 7B synthetic_v2 small-LLM-LoRA train / val
+
+- 分支与基线：`experiment/synthetic-v2-peft`；Phase 7A 已以 commit `786f1b8` 收口，其 step4800 持久化 SHA-256 为 `6c8f30d20e52b1e0473b8a9bdd69e682c944cbdcf6bed8c0c45f30a399eab3c4`
+- 数据边界：synthetic_v2 train 960 条训练，val 320 条评测；manifest SHA-256 `1815d127d9104db1e1d91d2dddd8080c099a4f84d922896f655910adca2154be`；未读取或推理 test
+- 初始化与对齐：从原始 Sa2VA full PTH（SHA-256 `5aa030f3203487281abcb57d7dbed72bba618b9f08859e1c020085454b2822e6`）初始化，没有使用 v1/v2 projection checkpoint 作为训练起点；P2、labels-aware `[SEG]`、strict one-to-one 与 Phase 7A 相同，未调用 `fix_number=5`
+- 可训练参数：4 个 `text_hidden_fcs.*` tensor（2,754,304）+ Qwen2 decoder layers 20–27 attention `q/k/v/o_proj` 的 64 个 LoRA A/B tensor（1,245,184）；总计 3,999,488 / 2,317,402,418（0.1726%）。rank/alpha/dropout=`16/32/0.05`，bias none，其余 LLM、vision、`mlp1`、SAM2 全部冻结
+- 优化：projection AdamW lr `4e-5` / wd `0.05`，LoRA lr `1e-4` / wd `0.01`，共用 240-step warmup + cosine；BF16，batch/accumulation `1/1`，seed `20260916`，5 epoch / 4,800 steps
+- smoke：固定 `cgev2_line_category_1609c9161fd4`，`[SEG]`/mask=`1/1`；language/mask CE/Dice/total=`0.258327/0.097388/0.488043/0.843757`；projection/LoRA gradient norm=`11.268785/1.155943`，冻结 gradient=0，两组参数都真实更新，68-tensor checkpoint 严格重载一致；peak allocated/reserved=`10169.8/10890.0 MiB`
+- 正式训练：4,800/4,800 steps，960 个 ID 各 5 次，所有 loss/gradient finite，每步 projection 4/4 非零梯度、LoRA 有非零梯度、冻结 gradient=0。epoch 1→5 的 mask CE `0.492507/0.420678/0.391523/0.351059/0.335890`，Dice `0.374837/0.339819/0.314065/0.291715/0.281630`，total `0.887970/0.760781/0.705841/0.642968/0.617666`
+- 时间/显存：model build `26.44s`，training loop `3824.64s`（63.74 min），peak allocated/reserved `14407.8/20698.0 MiB`；原始正式进程无 OOM、无重试
+- 中断恢复记录：监控会话中断时原训练进程仍在运行；误启的两个重复 launcher 均在 step 0 前退出（一个 `MASTER_PORT` 冲突，一个因原进程占用 GPU 而 OOM），未产生 checkpoint/训练步，未影响唯一完成的正式运行
+- val：只评测 B step960/1920/2880/3840/4800，五者 16-group Macro IoU 为 `0.213671/0.229796/0.238043/0.272492/0.273399`，Macro Dice `0.300999/0.321776/0.321669/0.362596/0.364193`；按预注册规则选 step4800，Micro IoU/Dice `0.401351/0.572806`，empty/overlap/disjoint `1.25%/89.6875%/9.0625%`
+- A/B：冻结 Strategy A step4800 Macro IoU/Dice `0.210365/0.292119`；B 提升 `+0.063034/+0.072073`，empty rate `-2.8125` 个百分点，16 组中 15 升/1 降，唯一下降 `line/category -0.007643`，没有组下降超过 0.03，三项预注册保留规则全部通过
+- 目标切片：`line/trend +0.012747`、`scatter/trend +0.046571`、`confidence_band/trend +0.259008`、hard difficulty `+0.035608`；确定性错误分类 wrong-series `31→29`，partial-target `53→54`
+- paired group bootstrap：Macro IoU 差 `+0.063034`，95% CI `[0.031990,0.101141]`；Macro Dice 差 `+0.072073`，95% CI `[0.036154,0.114923]`；seed `20260916`，10,000 次
+- 完整性：1,600/1,600 val metrics 与保存 mask 独立逐条重算一致；5 个 checkpoint 均为 68 tensor；Phase 7A 冻结 summary/metrics hash 与预注册值一致；没有重跑 zero-shot/A，没有访问 test
+- 实际命令模式：`CUDA_VISIBLE_DEVICES=<GPU_ID> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 MPLCONFIGDIR=<WORK_DIR> projects/sa2va/.venv/bin/python projects/chartground_edit/scripts/run_phase7b_v2_lora.py {smoke,train,evaluate} --config projects/chartground_edit/configs/phase7b_v2_lora.py --base-model <BASE_MODEL> --full-pth <FULL_PTH> --full-pth-sha256 <SHA256> --output-dir <WORK_DIR>/<stage> --base-revision <REVISION> --sa2va-hf-revision <REVISION>`
+- 结论：Strategy B 满足预注册简约选择规则，应保留 B 而非 A。下一主线应是冻结 step4800 并单次评测 synthetic_v2 test，不建议先进入 Strategy C
+
 ## 2026-09-18 Phase 7A synthetic_v2 projection-only train / val
 
 - 分支与基线：`experiment/synthetic-v2-peft`，基线 commit `0728d45`；开始时工作区 clean，synthetic_v2 manifest SHA-256 为 `1815d127d9104db1e1d91d2dddd8080c099a4f84d922896f655910adca2154be`
