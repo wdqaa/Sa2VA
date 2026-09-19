@@ -191,19 +191,37 @@ Strategy B 只训练约 `0.1726%` 参数；test 上相对 zero-shot 为 16/16 �
 
 ## 发布展示
 
-**Selected qualitative examples.** `remove` 使用 deterministic fill，不是生成式修复。
+**Selected qualitative examples.** 主图固定 line/highlight、bar/recolor、
+scatter/extract、confidence band/remove 四组，在各组成功编辑的冻结结果中取最高 IoU；
+这是精选展示，不代表平均效果。`remove` 使用 deterministic fill，不是生成式修复。
 
-![Selected qualitative examples](assets/chartground_edit_demo_gallery.png)
+![Selected qualitative examples](assets/chartground_edit_v2_demo.png)
 
 ![synthetic_v2 frozen-test ablation](assets/phase7c_v2_test_ablation.png)
 
-下图覆盖全部 16 个组合，并保留空预测和低 IoU 案例。
+<details>
+<summary>Detailed per-chart evaluation</summary>
 
-![Final Strategy B gallery](assets/phase7c_v2_final_gallery.png)
+以下四图覆盖 16 个 chart/referring 组合。每组取 IoU 最接近该组 20 条 test 样本
+中位数的代表样本，以 sample ID 打破平局；它们不是按最佳效果挑选。
 
-以下是按冻结规则选出的最差 6 条，而非人工挑选的成功案例。
+![Line median-case evaluation](assets/phase7c_v2_eval_line.png)
+
+![Bar median-case evaluation](assets/phase7c_v2_eval_bar.png)
+
+![Scatter median-case evaluation](assets/phase7c_v2_eval_scatter.png)
+
+![Confidence-band median-case evaluation](assets/phase7c_v2_eval_confidence_band.png)
+
+</details>
+
+以下展示按冻结规则确定的最差 6 条，包含零 IoU 案例，不隐藏失败。
 
 ![Deterministic worst failure cases](assets/phase7c_v2_failure_cases.png)
+
+[查看完整 16 组合 contact sheet](assets/phase7c_v2_final_gallery.png)。以上所有结果均来自
+`synthetic_v2`：最终 test Macro IoU 为 `0.294018`，256/320 个样本 IoU < 0.5，
+主要失败模式为 under-segmentation。
 
 ## 训练复现
 

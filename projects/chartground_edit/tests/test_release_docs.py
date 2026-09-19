@@ -83,10 +83,14 @@ def test_phase8_release_identity_limitations_and_gallery_order() -> None:
     ):
         assert value in readme
     gallery_order = (
-        "assets/chartground_edit_demo_gallery.png",
+        "assets/chartground_edit_v2_demo.png",
         "assets/phase7c_v2_test_ablation.png",
-        "assets/phase7c_v2_final_gallery.png",
+        "assets/phase7c_v2_eval_line.png",
+        "assets/phase7c_v2_eval_bar.png",
+        "assets/phase7c_v2_eval_scatter.png",
+        "assets/phase7c_v2_eval_confidence_band.png",
         "assets/phase7c_v2_failure_cases.png",
+        "assets/phase7c_v2_final_gallery.png",
     )
     positions = [readme.index(path) for path in gallery_order]
     assert positions == sorted(positions)
