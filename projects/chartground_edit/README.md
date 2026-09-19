@@ -13,6 +13,11 @@ ChartGround-Edit 是基于 Sa2VA-InternVL3-2B 的科学图表指代分割与可�
 - 严格的 train/val/test 隔离、预注册 checkpoint 选择和一次性 frozen test
 - 可复现的数据生成、对齐审计、训练、指标聚合和无 GT Demo CLI
 
+## Developer Guide
+
+开发者可从 [中文项目代码学习手册](docs/PROJECT_STUDY_GUIDE_ZH.md) 按数据流阅读
+synthetic_v2、InternVL3、`[SEG]`—SAM2 对齐、训练、LoRA 与编辑源码。
+
 ## 架构
 
 ```mermaid
