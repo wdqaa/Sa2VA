@@ -1,5 +1,14 @@
 # ChartGround-Edit 实验记录
 
+## 2026-09-19 Phase 8 synthetic_v2 LoRA release closeout
+
+- 范围：纯离线发布审核；未加载模型、未运行推理/训练、未访问或重算 frozen test，Phase 7C protocol 与正式结果未修改
+- Phase 7C 提交：`9e9d79b feat(chartground): add frozen synthetic v2 LoRA benchmark`
+- 发布入口：无 GT Demo 新增互斥 `--adapter-checkpoint`，固定接受 4 projection + 64 LoRA 的 Strategy B step4800；在模型构建前检查 SHA、step、P2、LoRA 和 base/full-PTH/manifest identity，模型侧继续严格检查 68 个 key/shape；旧 projection-only 参数保持兼容
+- 文档：项目/根 README、Model Card 和展示顺序统一到 synthetic_v2 最终结果；明确 synthetic-only、Macro IoU `0.294018`、256/320 低于 0.5、under-segmentation、line/trend、真实 OOD 未测及 deterministic remove 等限制
+- 离线验证：真实 adapter 审计为 68 tensors、3,999,488 参数、SHA-256 `c47ce4e38a9b1679c766d6360d66b6a3b69286d36b9d7cde50c70991ae475b97`；Phase 7 release 专项 30/30、ChartGround-Edit 全量 229/229、compileall、Markdown 链接、结果数值、敏感信息和 Git 大文件检查通过
+- 结论：代码与文档具备 release 条件；剩余人工操作只有 push、创建 release tag/标题并上传仓库外 adapter，不执行新的模型实验
+
 ## 2026-09-19 Phase 7C synthetic_v2 frozen test / A-B ablation
 
 - 冻结身份：protocol commit `de3b45f`，文件 SHA-256 `c7e82d6c7377eb1d4ae38a8051f73acfac13278c1ea93e7ebf4a0c69c90dcc22`；manifest SHA-256 `1815d127d9104db1e1d91d2dddd8080c099a4f84d922896f655910adca2154be`；P2 `target_only_zh`

@@ -21,14 +21,15 @@ The core unified model: SAM-2 + MLLM for referring segmentation, grounded conver
 
 An extension built on Sa2VA-InternVL3-2B for natural-language grounding of
 curves, bars, scatter series, and confidence bands, followed by controllable
-mask-based editing. Projection-only tuning improves synthetic_v1 frozen-test
-Macro IoU from **0.1980 to 0.4289** while training 2.75M parameters.
+mask-based editing. Its final projection + small-LLM-LoRA adapter improves the
+synthetic_v2 frozen-test Macro IoU from **0.0816 to 0.2940** while training
+about 0.1726% of model parameters.
 
-[![ChartGround-Edit fine-tuned test gallery](./projects/chartground_edit/assets/phase5b_finetuned_test_gallery.png)](./projects/chartground_edit/README.md)
+[![ChartGround-Edit Strategy B gallery](./projects/chartground_edit/assets/phase7c_v2_final_gallery.png)](./projects/chartground_edit/README.md)
 
 📂 [`projects/chartground_edit`](./projects/chartground_edit/README.md) ·
 [Model card](./projects/chartground_edit/MODEL_CARD.md) ·
-[Frozen-test results](./projects/chartground_edit/docs/phase5b_finetuned_test_results.md)
+[Frozen-test results](./projects/chartground_edit/docs/phase7c_v2_frozen_test_results.md)
 
 ### 🔍 [VRT](./projects/vrt_sa2va/README.md) — Visual Reasoning Tracer
 *Haobo Yuan, Yueyi Sun, Yanwei Li, Tao Zhang, Xueqing Deng, Henghui Ding, Lu Qi, Anran Wang, Xiangtai Li, Ming-Hsuan Yang*

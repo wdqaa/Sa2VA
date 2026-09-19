@@ -377,3 +377,13 @@ Strategy B step4800，四个状态各 320 次、共恰好 1,280 次 backend call
 提升 `+0.062052`；B 对 zero-shot 为 16/16 组提升，对 A 为 15/16 组提升。
 Strategy B 仍是由 val 预先选择的最终策略，没有根据 test 重新选择。完整 mask、指标、
 编辑与恢复状态均已离线复核；下一阶段仅应做最终 release 更新，不再开启 Strategy C。
+
+### Phase 8 实际状态（2026-09-19）
+
+已完成 synthetic_v2 LoRA release 收尾：Phase 7C 以 commit `9e9d79b` 提交；项目与
+根 README、最终 Strategy B Model Card、四图展示顺序和无 GT Demo CLI 已统一到
+68-tensor projection+LoRA adapter。CLI 保留旧 projection-only 兼容入口，并新增固定
+adapter 的 SHA、metadata、identity、key/shape fail-closed 加载；只运行 `--help`、真实
+checkpoint 离线审计和 mock/unit test，没有加载模型或执行推理。Phase 7 release 专项
+30/30、ChartGround-Edit 全量 229/229 通过。发布仍需人工 push、创建 tag/Release 并上传
+不纳入 Git 的 adapter checkpoint。

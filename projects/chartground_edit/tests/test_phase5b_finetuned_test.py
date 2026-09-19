@@ -70,6 +70,50 @@ def _write_projection(path: Path) -> Path:
     return path
 
 
+def _write_strategy_b_adapter(module, path: Path) -> Path:
+    targets = [
+        f"model.layers.{layer}.self_attn.{name}"
+        for layer in range(20, 28)
+        for name in ("q_proj", "k_proj", "v_proj", "o_proj")
+    ]
+    state = {
+        "text_hidden_fcs.0.weight": torch.zeros(1),
+        "text_hidden_fcs.0.bias": torch.zeros(1),
+        "text_hidden_fcs.2.weight": torch.zeros(1),
+        "text_hidden_fcs.2.bias": torch.zeros(1),
+    }
+    for target in targets:
+        for branch in ("A", "B"):
+            state[
+                f"language_model.base_model.model.{target}.lora_{branch}.default.weight"
+            ] = torch.zeros(1)
+    metadata = {
+        "optimizer_step": 4800,
+        "trainable_parameter_count": 3_999_488,
+        "source_hf_revision": SA2VA_REVISION,
+        "prompt_variant": "target_only_zh",
+        "prompt_template_sha256": module.P2_SHA256,
+        "prompt_registry_sha256": module.PROMPT_REGISTRY_SHA256,
+        "base_checkpoint": {"repo_id": BASE_REPO_ID, "revision": BASE_REVISION},
+        "full_pth": {"sha256": FULL_PTH_SHA256},
+        "manifest_sha256": module.V2_MANIFEST_SHA256,
+        "checkpoint_state": "text_hidden_fcs_plus_llm_lora",
+        "lora": {
+            "rank": 16,
+            "alpha": 32,
+            "dropout": 0.05,
+            "bias": "none",
+            "layers": list(range(20, 28)),
+            "target_modules": targets,
+            "modules_to_save": None,
+        },
+    }
+    torch.save(
+        {"meta": {"chartground_phase7b": metadata}, "state_dict": state}, path
+    )
+    return path
+
+
 def test_selected_checkpoint_hash_identity_and_four_tensor_contract(
     tmp_path: Path,
 ) -> None:
@@ -225,11 +269,100 @@ def test_demo_cli_requires_projection_and_supports_all_four_actions(
     with pytest.raises(SystemExit) as exc_info:
         module.parse_args([])
     assert exc_info.value.code == 2
-    assert "--projection-checkpoint" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert "--projection-checkpoint" in error and "--adapter-checkpoint" in error
     source = DEMO.read_text(encoding="utf-8")
     assert 'choices=sorted(EDIT_ACTIONS)' in source
     for action in ("highlight", "recolor", "extract", "remove"):
         assert action in module.EDIT_ACTIONS
+
+
+def test_demo_accepts_strict_strategy_b_adapter_without_ground_truth(
+    tmp_path: Path,
+) -> None:
+    module = _load(DEMO, "chartground_demo_strategy_b")
+    adapter = _write_strategy_b_adapter(module, tmp_path / "adapter.pth")
+    module.FINAL_ADAPTER_SHA256 = sha256_file(adapter)
+    audit = module.validate_selected_adapter(adapter)
+    assert audit == {
+        "adapter_checkpoint_sha256": sha256_file(adapter),
+        "adapter_tensor_count": 68,
+        "projection_tensor_count": 4,
+        "lora_tensor_count": 64,
+        "trainable_parameter_count": 3_999_488,
+    }
+
+    image_path = tmp_path / "chart.png"
+    Image.new("RGB", (8, 6), "white").save(image_path)
+    metadata_dir = tmp_path / ".cache/huggingface/download"
+    metadata_dir.mkdir(parents=True)
+    (metadata_dir / "config.json.metadata").write_text(
+        SA2VA_REVISION + "\n", encoding="utf-8"
+    )
+    captured = {}
+
+    class FakeBackend:
+        def __init__(self, *args, **kwargs):
+            captured.update(kwargs)
+
+        def predict_prompt(self, image, prompt, *, instruction):
+            return SimpleNamespace(
+                mask=np.ones((6, 8), dtype=bool),
+                text_output="Sure, [SEG].",
+                failure_reason=None,
+            )
+
+    args = argparse.Namespace(
+        checkpoint=tmp_path,
+        projection_checkpoint=None,
+        adapter_checkpoint=adapter,
+        image=image_path,
+        referring_expression="图中上升最快的折线",
+        action="highlight",
+        color="#E63946",
+        strength=0.65,
+        fill_mode="color",
+        neighbor_radius=5,
+        output_dir=tmp_path / "adapter-output",
+        device="cuda:0",
+        dtype="bfloat16",
+    )
+    result = module.run(
+        args,
+        backend_factory=FakeBackend,
+        adapter_validator=lambda path: audit,
+    )
+    assert captured["adapter_checkpoint"] == adapter
+    assert captured["adapter_identity"] == module.adapter_identity()
+    assert "projection_checkpoint" not in captured
+    assert result["checkpoint_kind"] == "projection_plus_lora"
+    assert result["adapter_checkpoint_sha256"] == audit["adapter_checkpoint_sha256"]
+    assert result["projection_checkpoint"] is None
+    assert result["edit_execution_success"] is True
+    assert "ground_truth" not in vars(args) and "gt" not in vars(args)
+
+
+def test_demo_rejects_unknown_sa2va_base_revision(tmp_path: Path) -> None:
+    module = _load(DEMO, "chartground_demo_base_revision")
+    with pytest.raises(ValueError, match="revision mismatch"):
+        module.validate_sa2va_revision(tmp_path)
+    metadata_dir = tmp_path / ".cache/huggingface/download"
+    metadata_dir.mkdir(parents=True)
+    (metadata_dir / "config.json.metadata").write_text("wrong-revision\n")
+    with pytest.raises(ValueError, match="revision mismatch"):
+        module.validate_sa2va_revision(tmp_path)
+
+
+def test_demo_rejects_combined_projection_and_adapter(tmp_path: Path) -> None:
+    module = _load(DEMO, "chartground_demo_mutual_exclusion")
+    args = argparse.Namespace(
+        checkpoint=tmp_path,
+        projection_checkpoint=tmp_path / "projection.pth",
+        adapter_checkpoint=tmp_path / "adapter.pth",
+        output_dir=tmp_path / "output",
+    )
+    with pytest.raises(ValueError, match="exactly one"):
+        module.run(args)
 
 
 def test_phase5b_runner_requires_projection_and_saved_baseline_arguments() -> None:

@@ -1,107 +1,116 @@
-# ChartGround-Edit projection model card
+# ChartGround-Edit Strategy B model card
 
 ## Model summary
 
-This checkpoint is a projection-only adaptation of
-`ByteDance/Sa2VA-InternVL3-2B`. It contains four `text_hidden_fcs.*` tensors
-and does not contain the LLM, vision encoder, InternVL `mlp1`, or SAM2 weights.
+ChartGround-Edit Strategy B is a parameter-efficient adapter for
+`ByteDance/Sa2VA-InternVL3-2B`. It is not a standalone model: the checkpoint
+contains four `text_hidden_fcs.*` tensors plus 64 LLM LoRA tensors and must be
+loaded with the exact Sa2VA base revision below. It contains no vision encoder,
+InternVL `mlp1`, SAM2, embedding, LM-head, or full LLM weights.
 
 | Field | Value |
 |---|---|
-| Base model | Sa2VA-InternVL3-2B |
-| Base InternVL identity | `OpenGVLab/InternVL3-2B@899155015275a9b7338c7f4677e19c784e0e5a21` |
-| Sa2VA identity | `15837dcaecc304714a1f0f069e74f47e47521c7f` |
-| Training strategy | Projection-only (`text_hidden_fcs`) |
-| Trainable parameters | 2,754,304 (about 0.12% of the 2.316B-parameter training model) |
+| Sa2VA base | `ByteDance/Sa2VA-InternVL3-2B@15837dcaecc304714a1f0f069e74f47e47521c7f` |
+| InternVL base identity | `OpenGVLab/InternVL3-2B@899155015275a9b7338c7f4677e19c784e0e5a21` |
+| Training full PTH SHA-256 | `5aa030f3203487281abcb57d7dbed72bba618b9f08859e1c020085454b2822e6` |
+| synthetic_v2 manifest SHA-256 | `1815d127d9104db1e1d91d2dddd8080c099a4f84d922896f655910adca2154be` |
 | Prompt | P2 `target_only_zh` |
-| Training data | `synthetic_v1` train, 192 samples |
-| Selection | step960, selected once on the 64-sample val split |
-| Checkpoint size | About 11 MB |
-| SHA-256 | `64c0d109d2985893ba1f2ba4c4fe7acc4265dc758e5d56ecb6ac8e2aa791f41e` |
+| Projection tensors | 4 `text_hidden_fcs.*` tensors |
+| LoRA targets | decoder layers 20–27, attention `q_proj/k_proj/v_proj/o_proj` |
+| LoRA configuration | rank 16, alpha 32, dropout 0.05, bias none |
+| LoRA tensors | 64; no `modules_to_save` |
+| Trainable parameters | 3,999,488 / 2,317,402,418 (about 0.1726%) |
+| Checkpoint step | 4800 |
+| Checkpoint size | 16,032,698 bytes (about 15.3 MiB) |
+| Checkpoint SHA-256 | `c47ce4e38a9b1679c766d6360d66b6a3b69286d36b9d7cde50c70991ae475b97` |
 
 Training selected only assistant `[SEG]` tokens whose labels were not `-100`
-and enforced one supervised token per GT mask. All non-projection modules were
+and enforced one supervised token per GT mask. The vision encoder, InternVL
+`mlp1`, SAM2, embeddings, LM head, LLM MLPs, and decoder layers 0–19 remained
 frozen.
 
-## Evaluation
+## Training, selection, and evaluation
 
-The checkpoint was evaluated once on the frozen 64-sample `synthetic_v1` test
-split. All figures below are synthetic-benchmark results, not evidence of
-stable generalization to real scientific publications.
+Strategy B was initialized from the original Sa2VA full PTH, not from a prior
+projection checkpoint. It trained on the 960-sample synthetic_v2 train split
+for five epochs. Strategy A and B were compared on the fixed 320-sample val
+split; B step4800 won the preregistered rule and was frozen before test.
 
-| Metric | Zero-shot Sa2VA | Projection-tuned |
-|---|---:|---:|
-| 16-group Macro IoU | 0.198033 | 0.428948 |
-| 16-group Macro Dice | 0.242366 | 0.534238 |
-| Micro IoU | 0.225301 | 0.397803 |
-| Micro Dice | 0.367748 | 0.569183 |
-| Empty rate | 42.1875% | 0% |
-| Overlap rate | 46.875% | 90.625% |
+The 320-sample synthetic_v2 test split was then evaluated exactly once in the
+fixed Zero-shot → v1 projection → v2 projection → v2 projection + LoRA order.
+The test result did not trigger checkpoint reselection, tuning, or retraining.
+All results below are synthetic-benchmark measurements, not evidence of stable
+generalization to real scientific publications.
 
-The frozen protocol and detailed group results are available in
-[phase5b_finetuned_test_protocol.md](docs/phase5b_finetuned_test_protocol.md)
-and [phase5b_finetuned_test_results.md](docs/phase5b_finetuned_test_results.md).
+| Model | Trainable | Macro IoU | Macro Dice | Micro IoU | Empty |
+|---|---:|---:|---:|---:|---:|
+| Zero-shot | 0 | 0.081553 | 0.125826 | 0.122480 | 34.3750% |
+| v1 projection | 2,754,304 | 0.192929 | 0.281413 | 0.239054 | 0.3125% |
+| v2 projection | 2,754,304 | 0.231966 | 0.318796 | 0.308443 | 2.8125% |
+| v2 projection + LoRA | 3,999,488 | **0.294018** | **0.386910** | **0.398550** | **1.5625%** |
 
-## Subsequent synthetic_v2 LoRA ablation
+B improves Macro IoU by `+0.212465` over zero-shot and `+0.062052` over
+Strategy A. The paired group bootstrap 95% CI for B−A Macro IoU is
+`[0.038416, 0.088712]`. Full identities, groups, bootstrap results, and the
+single-run integrity record are available in the
+[frozen protocol](docs/phase7c_v2_frozen_test_protocol.md) and
+[Phase 7C results](docs/phase7c_v2_frozen_test_results.md).
 
-A separate experimental Strategy B artifact adds rank-16 LoRA to the last eight
-LLM attention layers while retaining the four projection tensors (3,999,488
-trainable parameters total). It was selected on synthetic_v2 validation before
-one frozen 320-sample test. Its test Macro IoU/Dice is `0.294018/0.386910`,
-versus `0.231966/0.318796` for projection-only Strategy A and
-`0.081553/0.125826` for zero-shot. This does not replace or alter the v1
-projection-only checkpoint documented above. The separate Strategy B artifact
-has SHA-256 `c47ce4e38a9b1679c766d6360d66b6a3b69286d36b9d7cde50c70991ae475b97`.
-See
-[phase7c_v2_frozen_test_results.md](docs/phase7c_v2_frozen_test_results.md).
+The older synthetic_v1 projection-only artifact remains a distinct checkpoint;
+Strategy B does not overwrite or continue training from it.
 
 ## Loading and inference
 
-The checkpoint must be loaded together with the matching Sa2VA HF model. The
-project CLI validates its SHA-256, keys, tensor shapes, training step, and base
-identities before loading:
+The project CLI checks the released adapter SHA-256, all 68 keys, tensor shapes,
+training step, Prompt, LoRA configuration, and base/full-PTH/data identities.
+Unknown, missing, or mismatched weights are rejected.
 
 ```bash
 CUDA_VISIBLE_DEVICES=<GPU_ID> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
 projects/sa2va/.venv/bin/python \
   projects/chartground_edit/scripts/run_chartground_edit.py \
   --checkpoint <SA2VA_CHECKPOINT> \
-  --projection-checkpoint <PROJECTION_CHECKPOINT> \
-  --image <IMAGE> \
+  --adapter-checkpoint <CHARTGROUND_ADAPTER> \
+  --image <INPUT_IMAGE> \
   --referring-expression "图中上升最快的折线" \
   --action highlight --strength 0.65 \
   --output-dir <OUTPUT_DIR> \
   --device cuda:0 --dtype bfloat16
 ```
 
-Do not merge the four tensors into an unrelated Sa2VA revision. Unknown keys,
-missing tensors, shape mismatches, and identity mismatches are rejected.
+The CLI accepts `highlight`, `recolor`, `extract`, and `remove` and writes the
+predicted mask, overlay, edited image when applicable, and a JSON record. It
+does not accept a ground-truth mask.
 
 ## Intended use
 
-- Demonstrating natural-language referring segmentation on simple scientific
-  charts resembling the synthetic training distribution
-- Producing a predicted mask for deterministic highlight, recolor, extract,
-  and remove operations
-- Research and educational comparison of projection-only adaptation
+- Research and educational study of referring segmentation on synthetic
+  scientific charts
+- Producing predicted masks for deterministic highlight, recolor, extract, and
+  remove operations
+- Controlled comparison of projection-only and small-LLM-LoRA adaptation
 
-The checkpoint is not intended for safety-critical document processing,
-automatic scientific measurement, or unattended editing of source figures.
+The adapter is not intended for safety-critical document processing, automatic
+scientific measurement, or unattended editing of source figures.
 
 ## Limitations
 
-- Training and quantitative evaluation use Pillow-generated charts.
-- The frozen-test `bar/appearance` group remains at 0 IoU.
-- Stable performance on real paper figures has not been established.
-- `remove` is deterministic replacement, not generative inpainting.
-- Only the projection was adapted; the LLM, visual encoder, and SAM2 were not.
-- Complex subplots, 3D charts, heatmaps, composite charts, and character-level
-  OCR segmentation are outside the current scope.
+- All quantitative training and evaluation used Pillow-generated charts.
+- The final synthetic_v2 Macro IoU is `0.294018`, not production-level accuracy;
+  256/320 test samples have IoU below 0.5.
+- The largest failure category is `under-segmentation`, and `line/trend` remains
+  the weakest chart/referring group.
+- Quantitative OOD evaluation on real paper figures has not been completed.
+- `remove` performs deterministic filling, not generative content restoration.
+- The vision encoder and SAM2 are not adapted. Complex subplots, 3D charts,
+  heatmaps, composite charts, and character-level OCR segmentation remain out
+  of scope.
 
 ## License and upstream dependencies
 
-Repository code is provided under the repository's Apache-2.0 license. The
-projection checkpoint is a derived model artifact and requires the matching
-Sa2VA, InternVL3, and SAM2 components. Users are responsible for reviewing and
-complying with the licenses and terms of those upstream models and any data
-used with them. No upstream model weights are included in this repository.
+Repository code is provided under the repository's Apache-2.0 license. This is
+a derived adapter and requires the matching Sa2VA, InternVL3, and SAM2
+components. No upstream model weights are included. Users must review and
+comply with the licenses and terms of those upstream models; see the
+[Sa2VA upstream README](../sa2va/README.md) for project references and citation
+information.

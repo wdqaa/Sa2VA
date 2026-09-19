@@ -59,6 +59,8 @@ class Sa2VAInternVL3Backend:
         min_free_gpu_memory_mb: float = MIN_FREE_GPU_MEMORY_MB,
         projection_checkpoint: str | Path | None = None,
         projection_identity: dict[str, str] | None = None,
+        adapter_checkpoint: str | Path | None = None,
+        adapter_identity: dict[str, str] | None = None,
     ) -> None:
         checkpoint = Path(checkpoint_path)
         if not checkpoint.is_dir():
@@ -81,6 +83,14 @@ class Sa2VAInternVL3Backend:
             Path(projection_checkpoint) if projection_checkpoint is not None else None
         )
         self.projection_identity = projection_identity
+        self.adapter_checkpoint = (
+            Path(adapter_checkpoint) if adapter_checkpoint is not None else None
+        )
+        self.adapter_identity = adapter_identity
+        if self.projection_checkpoint is not None and self.adapter_checkpoint is not None:
+            raise ValueError(
+                "projection_checkpoint and adapter_checkpoint are mutually exclusive"
+            )
         if self.projection_checkpoint is not None:
             if not self.projection_checkpoint.is_file():
                 raise ValueError(
@@ -90,8 +100,16 @@ class Sa2VAInternVL3Backend:
                 raise ValueError(
                     "projection_identity is required with projection_checkpoint"
                 )
+        if self.adapter_checkpoint is not None:
+            if not self.adapter_checkpoint.is_file():
+                raise ValueError(
+                    f"adapter checkpoint does not exist: {self.adapter_checkpoint}"
+                )
+            if adapter_identity is None:
+                raise ValueError("adapter_identity is required with adapter_checkpoint")
         self._base_projection_state: dict[str, Any] | None = None
         self.active_projection_checkpoint: str | None = None
+        self.active_adapter_checkpoint: str | None = None
         self.model_load_attempts = 0
         self.model_load_time_ms: float | None = None
         self.pre_load_free_gpu_memory_mb: float | None = None
@@ -340,6 +358,19 @@ class Sa2VAInternVL3Backend:
                 expected_identity=self.projection_identity or {},
             )
             self.active_projection_checkpoint = str(self.projection_checkpoint)
+        if self.adapter_checkpoint is not None:
+            from chartground_edit.training.strategy_b import (
+                load_strategy_b_checkpoint_into_hf_model,
+                prepare_hf_strategy_b_model,
+            )
+
+            prepare_hf_strategy_b_model(model)
+            load_strategy_b_checkpoint_into_hf_model(
+                model,
+                self.adapter_checkpoint,
+                expected_identity=self.adapter_identity or {},
+            )
+            self.active_adapter_checkpoint = str(self.adapter_checkpoint)
 
     def _prepare_cuda_for_load(self) -> None:
         torch = self._import_torch()

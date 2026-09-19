@@ -27,7 +27,8 @@ flowchart LR
     U[User Prompt SEG] -. labels = -100; excluded .-> C
     T[Training] -. only labels != -100 assistant SEG .-> C
     P[Strategy A projection tuning] -. only text_hidden_fcs trainable .-> D
-    Q[Inference] -. loads about 11 MB projection checkpoint .-> D
+    Q[Final adapter] -. rank-16 LLM LoRA .-> B
+    Q -. four projection tensors .-> D
 ```
 
 训练对齐使用
@@ -55,19 +56,13 @@ test 相对 zero-shot 的 Macro IoU 提升 **+0.2309**，empty rate 从 **42.19%
 [Phase 5B results](docs/phase5b_finetuned_test_results.md) 和
 [saved summary](results/phase5b_finetuned_test_summary.json)。
 
-![Fine-tuned test: one deterministic sample from each of 16 groups](assets/phase5b_finetuned_test_gallery.png)
-
 Phase 5B 的可读版定量图完全由冻结的已保存 mask 重建，没有重跑模型。四类图分别见
 [line](assets/phase5b_eval_line.png)、[bar](assets/phase5b_eval_bar.png)、
 [scatter](assets/phase5b_eval_scatter.png) 和
 [confidence band](assets/phase5b_eval_confidence_band.png)；同时保留
 [确定性最差案例](assets/phase5b_failure_cases.png)。
-
-![Selected qualitative examples; remove uses deterministic fill](assets/chartground_edit_demo_gallery.png)
-
-编辑器也可独立使用 GT 或外部 mask 做像素级验证：
-
-![Deterministic mask editing operations](assets/editing_v0_gallery.png)
+历史 v1 的 [16-group gallery](assets/phase5b_finetuned_test_gallery.png) 和
+[确定性编辑操作](assets/editing_v0_gallery.png) 仍可单独查看。
 
 ## Quick Start
 
@@ -85,10 +80,12 @@ source projects/sa2va/.venv/bin/activate
 - Base：`OpenGVLab/InternVL3-2B@899155015275a9b7338c7f4677e19c784e0e5a21`
   （仅训练构建使用）
 - Sa2VA HF：`ByteDance/Sa2VA-InternVL3-2B@15837dcaecc304714a1f0f069e74f47e47521c7f`
-- Projection：约 11 MB 的 `chartground_projection_step960.pth`，SHA-256
-  `64c0d109d2985893ba1f2ba4c4fe7acc4265dc758e5d56ecb6ac8e2aa791f41e`
+- ChartGround adapter：约 16 MB 的 `chartground_v2_lora_step4800.pth`，SHA-256
+  `c47ce4e38a9b1679c766d6360d66b6a3b69286d36b9d7cde50c70991ae475b97`
 
-Projection checkpoint 不在 Git 中；发布者需另行提供下载地址并让用户校验 hash。
+Adapter checkpoint 不在 Git 中。它只包含 4 个 projection 和 64 个 LoRA tensor，
+不是可独立运行的完整模型，必须配合上面的固定 Sa2VA revision。CLI 默认拒绝 hash、
+base/full-PTH、数据或 LoRA identity 不匹配的 checkpoint。
 
 ### 2. 无 GT 推理与编辑
 
@@ -97,8 +94,8 @@ CUDA_VISIBLE_DEVICES=<GPU_ID> HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
 projects/sa2va/.venv/bin/python \
   projects/chartground_edit/scripts/run_chartground_edit.py \
   --checkpoint <SA2VA_CHECKPOINT> \
-  --projection-checkpoint <PROJECTION_CHECKPOINT> \
-  --image <IMAGE> \
+  --adapter-checkpoint <CHARTGROUND_ADAPTER> \
+  --image <INPUT_IMAGE> \
   --referring-expression "图中上升最快的折线" \
   --action recolor --color "#E63946" \
   --output-dir <OUTPUT_DIR> \
@@ -177,19 +174,36 @@ Phase 7B 在同一 projection 基础上增加 LLM 最后 8 层 attention q/k/v/o
 LoRA，总可训练参数为 3,999,488（0.1726%）。它先由固定 320 条 val 预选，再按冻结
 protocol 在 320 条 test 上与三个固定状态各评测一次；没有根据 test 重新选模型。
 
-| frozen test state | Macro IoU | Macro Dice | Micro IoU | Micro Dice | Empty rate |
+| Model | Trainable | Macro IoU | Macro Dice | Micro IoU | Empty |
 |---|---:|---:|---:|---:|---:|
-| Zero-shot | 0.081553 | 0.125826 | 0.122480 | 0.218231 | 34.3750% |
-| v1 step960 projection | 0.192929 | 0.281413 | 0.239054 | 0.385865 | 0.3125% |
-| v2 Strategy A | 0.231966 | 0.318796 | 0.308443 | 0.471465 | 2.8125% |
-| v2 Strategy B | **0.294018** | **0.386910** | **0.398550** | **0.569948** | **1.5625%** |
+| Zero-shot | 0 | 0.081553 | 0.125826 | 0.122480 | 34.3750% |
+| v1 projection | 2,754,304 | 0.192929 | 0.281413 | 0.239054 | 0.3125% |
+| v2 projection | 2,754,304 | 0.231966 | 0.318796 | 0.308443 | 2.8125% |
+| v2 projection + LoRA | 3,999,488 | **0.294018** | **0.386910** | **0.398550** | **1.5625%** |
 
-B 相对 zero-shot 的 Macro IoU 提升 `+0.212465`，相对 A 提升 `+0.062052`；16 个
-组合中分别提升 16 个和 15 个。详见
+B 相对 zero-shot 的 Macro IoU 提升 `+0.212465`，相对 Strategy A 提升
+`+0.062052`，后者 paired group bootstrap 95% CI 为 `[0.038416, 0.088712]`。
+Strategy B 只训练约 `0.1726%` 参数；test 上相对 zero-shot 为 16/16 组合提升。
+315 个非空 predicted mask 全部成功完成编辑，另外 5 个空预测明确跳过且没有使用 GT。
+详见
 [Phase 7C frozen-test results](docs/phase7c_v2_frozen_test_results.md) 与
 [saved summary](results/phase7c_v2_frozen_test_summary.json)。
 
+## 发布展示
+
+**Selected qualitative examples.** `remove` 使用 deterministic fill，不是生成式修复。
+
+![Selected qualitative examples](assets/chartground_edit_demo_gallery.png)
+
 ![synthetic_v2 frozen-test ablation](assets/phase7c_v2_test_ablation.png)
+
+下图覆盖全部 16 个组合，并保留空预测和低 IoU 案例。
+
+![Final Strategy B gallery](assets/phase7c_v2_final_gallery.png)
+
+以下是按冻结规则选出的最差 6 条，而非人工挑选的成功案例。
+
+![Deterministic worst failure cases](assets/phase7c_v2_failure_cases.png)
 
 ## 训练复现
 
@@ -243,9 +257,11 @@ projects/sa2va/.venv/bin/python -m pytest -q projects/chartground_edit/tests
 
 ## 已知局限
 
-- 当前定量评测主要基于 Pillow 合成图，未证明真实论文图表上的稳定泛化。
-- Fine-tuned test 的 `bar/appearance` 组仍为 0 IoU。
-- `remove` 是确定性填色或邻域统计替换，不是生成式图像修复。
+- 全部定量训练和评测来自 Pillow 合成图表；尚未完成真实论文图表的定量 OOD 评测。
+- 最终 frozen-test Macro IoU 为 `0.294018`，不是生产级精度；256/320 个 test 样本
+  IoU 低于 0.5。
+- 主要失败模式是 under-segmentation；`line/trend` 仍是最弱组合。
+- `remove` 是确定性填色或邻域统计替换，不是生成式内容恢复。
 - v1 发布 checkpoint 只更新 projection；v2 Strategy B 也只增加小型 LLM LoRA，
   vision encoder 和 SAM2 均未适配。
 - 暂未覆盖复杂子图、3D 图、热力图、组合图及字符级 OCR 分割。
