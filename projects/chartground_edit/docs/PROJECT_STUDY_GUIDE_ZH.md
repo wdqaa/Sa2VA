@@ -164,6 +164,24 @@ assert per_sample_seg_count == per_sample_gt_count == 1
 
 本固定配置的 `D_lm=1536`、vision hidden=1024、448 输入和 14 patch 来自固定 base/checkpoint 的配置文件（外部固定 revision；仓库内也可见 [`phase7b_v2_lora.py`](../configs/phase7b_v2_lora.py) 的 28 decoder layers 契约）。`N_visual = N_tiles × patch_token`，而 `patch_token=(448/14)^2×0.5^2=256`，所以若 N_tiles=7 则图像占位 token 为 1792。tile 数受宽高比和配置影响；不是每图 7。`L` 包含 Prompt、图像占位和回答，batch padding 后可变。
 
+下面按实际 [`extract_feature()`](../../sa2va/hf/models/modeling_sa2va_chat.py#L222) 与训练 [`_llm_forward()`](../../sa2va/models/mllm/internvl.py#L135) 的先后顺序列 shape。`T=ΣN_tiles`；表中 448/14/1024/1536/0.5 属于固定 checkpoint 配置，`B/L/T` 是运行时变量。`32×32` 和 `16×16` 是这些配置值的推导，不是额外保存的中间 tensor。
+
+| 变化节点 | shape（本固定配置） | 固定性与依据 |
+|---|---|---|
+| dynamic tile 输入 | `[T,3,448,448]` | `T` 运行时可变；448 配置固定；[`dynamic_preprocess()`](../../sa2va/datasets/data_utils.py) |
+| vision encoder 输出，含 CLS | `[T,1025,1024]` | 1025=`(448/14)²+1`、1024 配置固定；[`extract_feature()`](../../sa2va/hf/models/modeling_sa2va_chat.py#L222) 读取所选层；具体激活值未记录 |
+| 去 CLS | `[T,1024,1024]` | 源码 `[:,1:,:]` 固定；同上 |
+| spatial reshape | `[T,32,32,1024]` | 32 由 patch 网格推导；同上 |
+| `pixel_shuffle(0.5)` | `[T,16,16,4096]` | scale 配置固定；[`pixel_shuffle()`](../../sa2va/hf/models/modeling_sa2va_chat.py#L206) 将空间 2×2 收进通道 |
+| 展平并过 `mlp1` | `[T,256,1536]` | 256/1536 配置固定；[`extract_feature()`](../../sa2va/hf/models/modeling_sa2va_chat.py#L222) |
+| visual token 展平 | `[T×256,1536]` | `T` 运行时可变；[`_process_visual_prompts()`](../../sa2va/models/mllm/internvl.py#L215) 无 object prompt 时 reshape |
+| 替换 `<IMG_CONTEXT>` | 被替换位置数应等于 `T×256` | [`_embed_visual_features()`](../../sa2va/models/mllm/internvl.py#L269) 以 token ID 选择位置；不改变序列长度 |
+| LLM `inputs_embeds` | `[B,L,1536]` | `B/L` 运行时可变；[`_llm_forward()`](../../sa2va/models/mllm/internvl.py#L135) |
+| final hidden state | `[B,L,1536]` | hidden 维配置固定，`B/L` 可变；[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L341) 取最后层 |
+| assistant `[SEG]` hidden | strict 单目标时每样本 `[1,1536]` | 数量由 labels-aware 契约固定为 1；值与实际生成位置运行时可变；模型先对全序列投影再取位置 |
+
+Phase 4B 的 **v1 smoke1 历史观测**是 `T=7`、`L=1844`、`B=1`，因此该诊断对应 1792 个 visual token；它不是 Phase 7C test 样本的实测 tile/hidden shape。HF 推理的生成阶段由 [`predict_forward()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 提取 `[SEG]`，不能把训练表中的 `labels` 选择直接套到生成路径。
+
 ### 7.2 `[SEG]` hidden state 怎样成为目标向量
 
 训练 `output.hidden_states[-1]` 形如 `[B,L,1536]`；[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py) **先对全序列**施加 `text_hidden_fcs`，再以监督 mask 取出 `[N_supervised,256]`。它依据助手标签边界，不依据回答字符串位置。推理不同：HF [`predict_forward()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 调用 `generate(...,output_hidden_states=True)`，[`get_seg_hidden_states()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 按生成 `output_ids==seg_id` 提取生成阶段 hidden，再投影。`Sure, [SEG].` 是训练 target，推理回答不保证逐字相同；有 `[SEG]` 也不保证定位正确。
@@ -219,6 +237,40 @@ HF 推理实现不同：[`SAM2.get_sam2_embeddings()`](../../sa2va/hf/models/sam
 [`DirectResize.apply_image()`](../../sa2va/models/preprocess/image_resize.py) 把整张图缩为 1024 正方形；[`SAM2TrainRunner.preprocess_image()`](../../sa2va/models/sam2_train.py) 除以 255 后用 ImageNet 均值方差标准化。训练 mask head 给低分辨率 logits，实际空间尺寸由运行时 `pred_masks[0].shape[-2:]` 决定；[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py) 用 nearest 把 GT resize 到该尺寸后算 loss。历史代码中的 `_get_pesudo_data()` 有 256×256 伪 mask，但**不能把它当所有真实 logits 固定尺寸的证据**。
 
 HF [`predict_forward()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 把 SAM2 输出以 bilinear 恢复原图 `(H,W)`，再 `sigmoid()>0.5`，返回 NumPy bool mask（通常含 leading singleton）。项目后处理只做协议检查与必要的 nearest 几何恢复，不会用 GT 修改结果。训练的 GT resize 与推理的 logits resize方向相反：前者为 loss 对齐，后者为用户输出。
+
+单图训练的内部调用不是“把语言向量加到 image feature”：[`get_sam2_embeddings()`](../../sa2va/models/sam2_train.py#L108) 先调用 SAM2 `forward_image()`/`_prepare_backbone_features()`；[`inject_language_embd()`](../../sa2va/models/sam2_train.py#L74) 将最后一级视觉 feature 加 `no_mem_embed` 后 reshape 为 `backbone_features`，再把 `language_embd` 单独传给扩展的 [`SAM2Base._forward_sam_heads()`](../../sa2va/models/extension/sam2_base.py#L112)。该方法用一个 label=-1 的空 point 调 `sam_prompt_encoder`，得到 `sparse_embeddings` 与 `dense_embeddings`；没有 mask 输入时，dense 支路使用 prompt encoder 的 learned `no_mask_embed`。**256 维语言向量是沿 sparse prompt 的 token 维拼接**（`torch.cat(...,dim=1)`），不是像素图、不是 dense mask prompt。视觉和语言首次汇合在 `sam_mask_decoder(image_embeddings=backbone_features, sparse_prompt_embeddings=..., dense_prompt_embeddings=..., high_res_features=...)`。
+
+```mermaid
+flowchart TB
+  A[① 1024 图像] --> B[② forward_image/FPN]
+  B --> C[③ image features + no_mem_embed]
+  D[④ SEG projection 256] --> E[⑤ sparse prompt 拼接]
+  F[⑥ 空 point 与 no-mask dense prompt] --> E
+  C --> G[⑦ mask decoder]
+  E --> G
+  G --> H[⑧ low-res logits / IoU estimates]
+  H --> I[⑨ 单 mask 或最高 IoU 候选]
+```
+
+| 节点 | 图中节点对应源码 |
+|---|---|
+| ①–② | [`DirectResize.apply_image()`](../../sa2va/models/preprocess/image_resize.py)、[`SAM2TrainRunner.get_sam2_embeddings()`](../../sa2va/models/sam2_train.py#L108) |
+| ③ | [`SAM2TrainRunner.inject_language_embd()`](../../sa2va/models/sam2_train.py#L74) 的 `current_vision_feats` 与 `no_mem_embed` |
+| ④ | [`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L341) 的 `text_hidden_fcs` 输出 |
+| ⑤–⑦ | [`SAM2Base._forward_sam_heads()`](../../sa2va/models/extension/sam2_base.py#L112) 的 prompt encoder、`torch.cat` 和 mask decoder |
+| ⑧–⑨ | 同一方法返回 `low_res_multimasks/ious/low_res_masks`；multimask 时以最高估计 IoU 选一个 |
+
+| SAM2 内部张量/值 | 训练单目标 shape 或契约 | 固定性 |
+|---|---|---|
+| 视觉金字塔 | `current_vision_feats` 为多尺度 list，末级按 `feat_sizes[-1]` 还原为 `[B,256,H_f,W_f]` | 256 为模型 hidden 配置；`H_f/W_f` 由 backbone/输入决定，当前文档未记录实测值 |
+| no-memory image feature | `[B,256,H_f,W_f]` | 训练 `directly_add_no_mem_embed` 分支；不是跨帧 memory attention |
+| 投影语言向量 | `[B,1,256]`（strict 单目标） | 1 来自对齐契约；256 为 prompt 维度 |
+| 空 point / labels | `[B,1,2]` / `[B,1]`，label=-1 | [`_forward_sam_heads()`](../../sa2va/models/extension/sam2_base.py#L112) 源码固定 |
+| sparse / dense prompt | sparse `[B,N_s,256]` 再拼语言为 `[B,N_s+1,256]`；dense `[B,256,H_f,W_f]` | `N_s` 及空间值应运行时观察；dense 来自 no-mask embedding |
+| 低分辨率候选 logits | `[B,M,4H_f,4W_f]`，`M=1` 或 3 | 扩展方法 docstring 与 `multimask_output` 控制；实际 `H_f/W_f` 未记录 |
+| 用于 loss 的选中 logits | `low_res_masks [B,1,4H_f,4W_f]`；多候选时按 `ious.argmax` 选 | 源码固定的选择规则；不是用 GT 选最佳候选 |
+
+HF 固定 checkpoint remote code 的相应分支在仓库镜像 [`SAM2.language_embd_inference()`](../../sa2va/hf/models/sam2.py#L332) → [`SAM2VideoPredictor.add_language_embd()`](../../sa2va/hf/models/sam2.py#L3752) → HF 镜像 [`_forward_sam_heads()`](../../sa2va/hf/models/sam2.py#L3190)：同样把 language token 拼到 sparse prompt，但先 `init_state(images)`，`add_language_embd(...,inference=True)` 后又调用 `propagate_in_video()`，返回的是传播阶段 mask。训练直接消费 low-res logits 算损失；HF 推理再由 [`predict_forward()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 缩放/阈值化。`SAM2VideoPredictor` 的状态维护与传播不能从训练 runner 的直接 mask-head 路径推断。基础 SAM2 prompt/mask decoder 的具体内部注意力层属第三方实现；当前仓库训练配置通过 [`SAM2TrainRunner.__init__()`](../../sa2va/models/sam2_train.py#L17) 加载 `third_parts.sam2`，这里仅陈述本 fork 实际传入的张量接口，不替第三方内部编造额外步骤。
 
 ### 9.3 Loss 与冻结梯度
 
@@ -388,24 +440,36 @@ v2 test 每组恰好 20 条，因此其 Sample Macro 和 16-group Macro 数值�
 
 Paired group bootstrap 先按 sample ID 配对 B/A，逐组取平均差，再以固定 seed 对 16 组有放回抽样 10,000 次，取 2.5/97.5 分位；它衡量冻结 test 上组间差值的不确定性，不是重新选择模型的依据。错误类型由 [`_failure_analysis()`](../scripts/run_phase7c_v2_frozen_test.py) 依冻结规则给出；可视化不是指标计算入口。常见错误：把空 mask 排除、把编辑成功当 IoU、对 B 与 A 用不同样本或让 test 参与 checkpoint 选择。对应测试：[`test_phase7c_v2_frozen_test.py`](../tests/test_phase7c_v2_frozen_test.py)、[`test_split_baseline.py`](../tests/test_split_baseline.py)、[`test_phase8b_saved_visualizations.py`](../tests/test_phase8b_saved_visualizations.py)。
 
-## 16. 一条真实样本的端到端追踪
+## 16. 两条真实样本追踪：训练诊断与冻结推理结果
 
-优先选有完整 tokenizer 诊断的 v1 train smoke1 `cgev1_bar_category_6d51bac154`，而不是给 v2 样本虚构 token 位置。下面“观测”来自冻结 [`phase4b_alignment_protocol.md`](phase4b_alignment_protocol.md)；后半段未记录每个中间 tensor 的具体运行 shape，明确写“运行时可变”。同一套代码在 v2 的 [`Phase7V2SplitDataset`](../chartground_edit/training/data_adapter.py) 上使用。
+### 16.1 训练样本：v1 smoke1 的监督边界
 
-| 顺序 | 真实观测 / 静态契约 | 去哪里看与推荐观察 |
+使用已有 [`phase4b_alignment_protocol.md`](phase4b_alignment_protocol.md) 的 v1 train 样本 `cgev1_bar_category_6d51bac154`。这是**训练 tokenizer/collator 诊断**，不是一次新的训练，也不能把它的 tile/token 位置当成 v2 常数。同一适配链可用于 v2 [`Phase7V2SplitDataset`](../chartground_edit/training/data_adapter.py)，但 v2 逐层张量并未因此自动记录。
+
+| 数据流 | 已记录观测或源码契约 | 实际代码位置 |
 |---|---|---|
-| JSONL → Reader | smoke1 是 train；原图 `480×320` | [`Phase4TrainDataset.__getitem__()`](../chartground_edit/training/data_adapter.py)；看 `sample_id/split` |
-| 图像/GT | RGB `480×320`；GT `uint8[1,320,480]`、前景 8127 | [`_load_sample()`](../chartground_edit/training/data_adapter.py)、[`ChartGroundPhase4Dataset.prepare_data()`](../chartground_edit/training/sa2va_adapter.py) |
-| P2/target | user P2 内一个 `[SEG]`；assistant `Sure, [SEG].` | [`build_prompt_variant()`](../chartground_edit/inference/prompt_variants.py)、[`ASSISTANT_TARGET`](../chartground_edit/training/data_adapter.py) |
-| tokenizer/collate | `input_ids/labels=[1,1844] long`；SEG id 151674；user pos 1823→-100、assistant pos 1840→151674 | [`tokenize_conversation()`](../../sa2va/datasets/data_utils.py)、[`chartground_sa2va_collect_fn()`](../chartground_edit/training/sa2va_adapter.py) |
-| MLLM 图像 | 7 个 `[3,448,448]` tile；`pixel_values` 是 list 内 `[7,3,448,448]` | [`_process_single_image()`](../../sa2va/datasets/base.py)；运行时可变 |
-| SAM2 图像 | `[3,1024,1024]` | [`DirectResize.apply_image()`](../../sa2va/models/preprocess/image_resize.py) |
-| SEG 对齐 | 原条件选 `[1823,1840]`，监督条件只选 `[1840]`；GT count=1 | [`Sa2VAModel.select_seg_token_mask()`](../../sa2va/models/sa2va.py)、[`validate_strict_alignment()`](../../sa2va/models/sa2va.py) |
-| hidden/projection | 最后层 `[B,L,1536]` 为静态维度契约；目标向量 `[1,256]` | [`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py)；**此样本的完整 hidden tensor 未单独记录** |
-| logits/loss | GT nearest 到 logits 空间；mask CE、Dice 与 language CE | [`Sa2VAModel.sample_points()`](../../sa2va/models/sa2va.py)；**logits H/W 为运行时值** |
-| 推理 mask/IoU/edit | 训练诊断不做推理/编辑；这里没有该样本的预测 mask、IoU 或编辑图，不得补造 | 若调试已有结果才查 [`process_prediction_masks()`](../chartground_edit/inference/mask_processing.py)、[`edit()`](../chartground_edit/editing/editor.py) |
+| JSONL → Reader | train，原图 `480×320` | [`Phase4TrainDataset.__getitem__()`](../chartground_edit/training/data_adapter.py)、[`_load_sample()`](../chartground_edit/training/data_adapter.py#L219) |
+| 图像与 GT | RGB `480×320`；GT `uint8[1,320,480]`、前景 8127 像素 | [`ChartGroundPhase4Dataset.prepare_data()`](../chartground_edit/training/sa2va_adapter.py#L75) |
+| P2/assistant | user P2 含 `[SEG]`；assistant target 为 `Sure, [SEG].` | [`build_prompt_variant()`](../chartground_edit/inference/prompt_variants.py#L27)、[`ASSISTANT_TARGET`](../chartground_edit/training/data_adapter.py) |
+| Tokenizer → batch | `input_ids/labels=[1,1844] long`，SEG token ID 151674 | [`tokenize_conversation()`](../../sa2va/datasets/data_utils.py#L74)、[`chartground_sa2va_collect_fn()`](../chartground_edit/training/sa2va_adapter.py#L106) |
+| 双 `[SEG]` → 监督选择 | user 位置 1823 的 label=-100；assistant 位置 1840 的 label=151674；原条件选两处，labels-aware 只选 1840；GT count=1 | [`select_seg_token_mask()`](../../sa2va/models/sa2va.py#L186)、[`validate_strict_alignment()`](../../sa2va/models/sa2va.py) |
+| MLLM 双路图像 | tile `[7,3,448,448]`；SAM2 输入 `[3,1024,1024]` | [`_process_single_image()`](../../sa2va/datasets/base.py)、[`DirectResize.apply_image()`](../../sa2va/models/preprocess/image_resize.py) |
+| MLLM → projection | 依据配置，最后层每 token 1536 维、projected SEG 256 维；**此样本实际 hidden 数值/完整 shape 未记录** | [`InternVLMLLM._llm_forward()`](../../sa2va/models/mllm/internvl.py#L135)、[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L341) |
+| SAM2 → loss | 图像 feature、sparse language prompt、mask logits → GT nearest 对齐后 mask CE/Dice，加上 language CE；**此样本 logits shape、三项 loss 数值未记录** | [`inject_language_embd()`](../../sa2va/models/sam2_train.py#L74)、[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L341) |
 
-另一个 v2 真实 train 样本 `cgev2_line_category_1609c9161fd4` 已在 §4 给出 record（720×360），但仓库没有它的完整 tokenizer/hidden/logit 逐层记录；千万不要套用上表的 `L=1844` 或 7 tile。这个“未知”正是下一次合法调试时应该打断点观察的值，而不是文档缺口可以凭经验填平。
+### 16.2 推理样本：已保存的 Phase 7C Strategy B 结果
+
+本节只读取 [`Phase 7C metrics JSONL`](../results/phase7c_v2_frozen_test_metrics.jsonl) 的第 961 条（`state=v2_strategy_b`）与原始 v2 record，离线核对既有 mask/编辑图。样本 `cgev2_line_category_c150037d8a1e` 是 test 中一张 560×420 深色 line 图；选择它是为了演示一条**已有完整产物**的链路，不用于重新选择模型或展示最佳效果。图像、GT 位于 v2 manifest 的相对 `images/`、`masks/` 路径；运行产物目录约定下，保存的文件分别是 `masks/v2_strategy_b/<sample_id>.png` 和 `edited/v2_strategy_b/<sample_id>.png`，不把本机输出根目录写进文档。
+
+| 数据流 | 冻结记录与离线文件核对 | 实际代码位置 |
+|---|---|---|
+| image / expression → P2 | 原图 RGB `560×420`；表达式“类别 Group A 对应的曲线”；P2 仅插入该表达式，不带 highlight 参数 | [`build_prompt_variant()`](../chartground_edit/inference/prompt_variants.py#L27)、模块级 [`_load_sample()`](../chartground_edit/training/data_adapter.py#L219) |
+| P2 → backend | Strategy B adapter 严格加载后，backend 将 P2 交给固定 HF remote-code `predict_forward()`；**此样本 tile 数、LLM hidden shape、SAM2 内部 logits shape 未记录** | [`Sa2VAInternVL3Backend.predict_prompt()`](../chartground_edit/inference/sa2va_backend.py#L176)、HF [`predict_forward()`](../../sa2va/hf/models/modeling_sa2va_chat.py) |
+| saved predicted mask | 已保存 `L` PNG `560×420`；记录的 raw mask 为 bool `[1,420,560]`、`num_masks=1`、`mask_contract_valid=true`、`segmentation_token_present=true`；二值数组 SHA-256=`6d50c99519d0cf655c325362ef96b226b1d508c8f5e498ceac12123603571a80`（不是 PNG 文件 hash） | [`process_prediction_masks()`](../chartground_edit/inference/mask_processing.py#L40)、[`_prediction_row()`](../scripts/run_phase7c_v2_frozen_test.py) |
+| mask → IoU/Dice | GT 前景 1467、预测前景 815、交集 472、并集 1810；`IoU=472/1810=0.2607734807`，`Dice=944/(1467+815)=0.4136722174`；非空且 overlap，错误分类 `partial target` | [`intersection_over_union()`](../chartground_edit/inference/metrics.py#L12)、[`dice_score()`](../chartground_edit/inference/metrics.py#L20)、[`_prediction_row()`](../scripts/run_phase7c_v2_frozen_test.py) |
+| action → saved edit | 原 record 的 `edit_action=highlight`、`strength=0.65`；冻结记录 `edit_attempted=true`、`edit_execution_success=true`、`edit_skipped_empty=false`；保存的编辑结果是 RGB `560×420`。编辑器只用预测 mask，不用 GT | [`_prediction_row()`](../scripts/run_phase7c_v2_frozen_test.py#L329) → [`apply_predicted_mask_edit()`](../chartground_edit/inference/frozen_test_v1.py#L354) → [`edit()`](../chartground_edit/editing/editor.py#L39) |
+
+这条链的“已保存”只涵盖预测 mask、mask metadata、像素统计与编辑图；没有逐层 hidden、attention、prompt embedding 或中间 logits 的快照，因此这些 shape/数值都应标为**未记录**，不能从最终 IoU 倒推。另一个 v2 train 记录 `cgev2_line_category_1609c9161fd4` 在 §4 仅示范 schema，也没有 tokenizer 逐层诊断。
 
 ## 17. 推荐断点与 VS Code 调试路线
 
@@ -441,22 +505,22 @@ Paired group bootstrap 先按 sample ID 配对 B/A，逐组取平均差，再以
 
 ## 18. 测试如何保护数据流
 
-测试文件都真实存在；函数名可用 `rg -n '^def test_'` 进一步定位。无模型/GPU 的单测重在契约，而非证明 IoU。
+以下函数名已逐个对照当前测试定义；无模型/GPU 的单测重在契约，而非证明 IoU。
 
 | 测试文件 / 代表函数 | 守护的契约 | 若失败先怀疑什么 |
 |---|---|---|
 | [`test_synthetic_v2.py::test_v2_render_is_deterministic_and_masks_have_chart_semantics`](../tests/test_synthetic_v2.py) | 生成确定性、split 和 mask | seed/style/几何变换漂移 |
-| [`test_phase4a_training_data.py`](../tests/test_phase4a_training_data.py) | 仅允许目标字段越过训练边界 | full instruction/action 泄漏 |
+| [`test_phase4a_training_data.py::test_adapter_contract_masks_prompts_and_seg_count`](../tests/test_phase4a_training_data.py#L113) | 仅允许目标字段越过训练边界 | full instruction/action 泄漏 |
 | [`test_phase4b_alignment.py::test_real_smoke_collator_is_strict_one_to_one`](../tests/test_phase4b_alignment.py) | labels-aware SEG 与 mask 1:1 | tokenizer/label 边界或 collate 错 |
-| [`test_phase7a_v2_projection.py`](../tests/test_phase7a_v2_projection.py) | 960 train、4800 step、projection-only | split/冻结/采样合同变化 |
-| [`test_phase7b_v2_lora.py`](../tests/test_phase7b_v2_lora.py) | LoRA exact targets、68 tensor loader | 错层、错参数组或 adapter key |
-| [`test_inference.py`](../tests/test_inference.py) | lazy backend、mask 类型与尺寸 | remote output 协议/后处理变化 |
-| [`test_editing.py`](../tests/test_editing.py) | 四动作、mask 内外像素语义 | editor 回归、透明度错误 |
-| [`test_phase7c_v2_frozen_test.py`](../tests/test_phase7c_v2_frozen_test.py) | 固定四状态/指标/无 test 重试 | frozen identity、聚合或状态残留 |
+| [`test_phase7a_v2_projection.py::test_phase7a_fixed_schedule_visits_each_train_sample_five_times`](../tests/test_phase7a_v2_projection.py#L77) | 960 train、4800 step 的访问顺序；同文件配置测试保护 projection-only | split/冻结/采样合同变化 |
+| [`test_phase7b_v2_lora.py::test_exact_last_eight_attention_targets`](../tests/test_phase7b_v2_lora.py#L65)、[`test_strategy_b_hf_loader_is_strict_and_casts_dtype`](../tests/test_phase7b_v2_lora.py#L173) | LoRA exact targets、68 tensor loader | 错层、错参数组或 adapter key |
+| [`test_inference.py::test_backend_lazy_loads_once_and_records_upstream_contract`](../tests/test_inference.py#L210)、[`test_resize_uses_nearest_and_preserves_binary_values`](../tests/test_inference.py#L123) | lazy backend、mask 类型与尺寸 | remote output 协议/后处理变化 |
+| [`test_editing.py::test_all_actions_handle_all_chart_types`](../tests/test_editing.py#L92)、[`test_recolor_keeps_every_outside_pixel_unchanged`](../tests/test_editing.py#L49) | 四动作、mask 内外像素语义 | editor 回归、透明度错误 |
+| [`test_phase7c_v2_frozen_test.py::test_phase7c_aggregation_is_test_only_and_uses_all_four_states`](../tests/test_phase7c_v2_frozen_test.py#L91) | 固定四状态/指标；同文件 runner 测试保护无训练入口 | frozen identity、聚合或状态残留 |
 | [`test_phase8b_saved_visualizations.py::test_tp_fp_fn_colors_are_exact`](../tests/test_phase8b_saved_visualizations.py) | 离线 error map 与样本选择 | 图示不忠于保存 mask |
 | [`test_release_docs.py::test_release_markdown_relative_links_exist`](../tests/test_release_docs.py) | 公开文档相对链接 | 文件移动后未修链接 |
 
-注意：首行具体函数名应以当前测试定义为准；全量测试只应限定在 `projects/chartground_edit/tests`，仓库根 pytest 会收集无关脚本。建议先跑契约最小集再跑全量，不必为读文档加载模型。
+全量测试只应限定在 `projects/chartground_edit/tests`，仓库根 pytest 会收集无关脚本。建议先跑契约最小集再跑全量，不必为读文档加载模型。
 
 ## 19. 四天学习路线与无大模型练习
 
@@ -509,108 +573,127 @@ Paired group bootstrap 先按 sample ID 配对 B/A，逐组取平均差，再以
 | metrics | [`metrics.py`](../chartground_edit/inference/metrics.py) | [`run_phase7c_v2_frozen_test.py`](../scripts/run_phase7c_v2_frozen_test.py) | [`test_phase7c_v2_frozen_test.py`](../tests/test_phase7c_v2_frozen_test.py) |
 | gallery | [`render_phase8b_saved_visualizations.py`](../scripts/render_phase8b_saved_visualizations.py) | [`README.md`](../README.md) | [`test_phase8b_saved_visualizations.py`](../tests/test_phase8b_saved_visualizations.py) |
 
+下面 30 个高频入口的行号已用 `rg` 对照本次修订前的源码 commit `9aa2930`；跳转时**同时认文件与 symbol**，后续源码改动可能使行号偏移。HF 项是仓库镜像定位；真实推理仍执行固定 checkpoint 的 remote code。
+
+| 环节 | 当前源码定位（symbol + 行号） | 环节 | 当前源码定位（symbol + 行号） |
+|---|---|---|---|
+| v2 Reader | [`Phase7V2SplitDataset`, L160](../chartground_edit/training/data_adapter.py#L160) | record 装载 | [`_load_sample()`, L219](../chartground_edit/training/data_adapter.py#L219) |
+| 训练适配 | [`ChartGroundPhase4Dataset`, L24](../chartground_edit/training/sa2va_adapter.py#L24) | `prepare_data()` | [`ChartGroundPhase4Dataset.prepare_data()`, L75](../chartground_edit/training/sa2va_adapter.py#L75) |
+| 双路图像 | [`Sa2VADatasetMixin._process_single_image()`, L121](../../sa2va/datasets/base.py#L121) | 项目 collate | [`chartground_sa2va_collect_fn()`, L106](../chartground_edit/training/sa2va_adapter.py#L106) |
+| 官方 collate | [`sa2va_collect_fn()`, L184](../../sa2va/datasets/data_utils.py#L184) | tokenizer | [`tokenize_conversation()`, L74](../../sa2va/datasets/data_utils.py#L74) |
+| MLLM | [`InternVLMLLM._llm_forward()`, L135](../../sa2va/models/mllm/internvl.py#L135) | visual 替换 | [`InternVLMLLM._embed_visual_features()`, L269](../../sa2va/models/mllm/internvl.py#L269) |
+| vision 特征 | [`Sa2VAChatModel.extract_feature()`, L222](../../sa2va/hf/models/modeling_sa2va_chat.py#L222) | 语言 CE | [`InternVLMLLM._compute_loss()`, L303](../../sa2va/models/mllm/internvl.py#L303) |
+| SEG 选择 | [`Sa2VAModel.select_seg_token_mask()`, L186](../../sa2va/models/sa2va.py#L186) | 严格对齐 | [`Sa2VAModel.validate_strict_alignment()`, L216](../../sa2va/models/sa2va.py#L216) |
+| projection 定义 | [`Sa2VAModel.__init__().text_hidden_fcs`, L84](../../sa2va/models/sa2va.py#L84) | 训练模型/loss | [`Sa2VAModel.forward()`, L341；mask loss L423–445](../../sa2va/models/sa2va.py#L341) |
+| SAM2 image embedding | [`SAM2TrainRunner.get_sam2_embeddings()`, L108](../../sa2va/models/sam2_train.py#L108) | language 注入 | [`SAM2TrainRunner.inject_language_embd()`, L74](../../sa2va/models/sam2_train.py#L74) |
+| prompt/mask head | [`SAM2Base._forward_sam_heads()`, L112](../../sa2va/models/extension/sam2_base.py#L112) | 推理 HF 入口 | [`Sa2VAChatModel.predict_forward()`, L589](../../sa2va/hf/models/modeling_sa2va_chat.py#L589) |
+| 推理 backend | [`Sa2VAInternVL3Backend.predict_prompt()`, L176](../chartground_edit/inference/sa2va_backend.py#L176) | lazy load | [`Sa2VAInternVL3Backend._perform_load()`, L332](../chartground_edit/inference/sa2va_backend.py#L332) |
+| mask 后处理 | [`process_prediction_masks()`, L40](../chartground_edit/inference/mask_processing.py#L40) | adapter 严格加载 | [`load_strategy_b_checkpoint_into_hf_model()`, L305](../chartground_edit/training/strategy_b.py#L305) |
+| projection 加载 | [`load_projection_checkpoint_into_model()`, L32](../chartground_edit/inference/projection_checkpoint.py#L32) | 四动作派发 | [`edit()`, L39](../chartground_edit/editing/editor.py#L39) |
+| 单样本指标 | [`intersection_over_union()`, L12；`dice_score()`, L20](../chartground_edit/inference/metrics.py#L12) | 聚合 | [`summarize()`, L425](../scripts/run_phase7c_v2_frozen_test.py#L425) |
+| 冻结单样本记录 | [`_prediction_row()`, L329](../scripts/run_phase7c_v2_frozen_test.py#L329) | 配对 bootstrap | [`paired_group_bootstrap()`, L483](../scripts/run_phase7c_v2_frozen_test.py#L483) |
+
 最后再次强调边界：阅读本手册不需要模型。确切的运行时 tile 数、hidden/logit tensor 的实际值、显存或新图表上的 IoU，只能由对应授权实验/断点给出；旧实验数值只能作为冻结历史记录使用，不能推断新的性能。
 
-## 22. 核心阶段逐站排错卡
+## 附录 A：逐站排错速查表
 
-前文按故事线解释“为什么”；这组卡片适合拿着一个 sample ID 从入口逐站核对。`B/N_tiles/L/H/W` 分别表示 batch、tile 数、文本长、原图高宽；写成符号即表示随数据或运行时变化。
+本附录只保留诊断入口；设计缘由与调用链见 §4–§17。形状中的 B/T/L/H/W 分别是 batch、tile 总数、文本长、原图高宽，均可能随输入变化。
 
-### 22.1 生成与 schema
+### A.1 生成与 schema
 
-- 目的：让语义唯一的目标、原图与 mask 在落盘时保持同一几何坐标系。
-- 输入：固定 seed、chart/referring/action 配额及 style plan；由 [`build_generation_plan_v2()`](../chartground_edit/datasets/synthetic_v2.py) 组织。
-- 输出：RGB PNG、单通道二值 PNG、JSONL record；mask `[H,W] uint8` 文件值 `{0,255}`。
-- 调用：[`generate_synthetic_v2()`](../chartground_edit/datasets/synthetic_v2.py) 调 [`render_scene_v2()`](../chartground_edit/datasets/render_v2.py)，落盘后调 [`validate_jsonl_v2()`](../chartground_edit/datasets/schema_v2.py)。
-- 设计缘由：训练只需 target，不需把 action/色彩规则变成模型目标；审计记录另保存 scene/content/style identity。
-- 常见错误：原图退化/resize 后 mask 未同步、legend glyph 误入目标、referring 不唯一。检查 [`_apply_degradation()`](../chartground_edit/datasets/render_v2.py)。
-- 测试/断点：[`test_synthetic_v2.py`](../tests/test_synthetic_v2.py)；断在 `render_scene_v2` 返回时对比 `image.size==mask.size` 与 `generation_metadata.reference_match_count`。
+- 输入：固定 seed、style plan、chart/referring/action 配额。
+- 输出：RGB PNG、非空二值 mask、JSONL record。
+- 首个断点：[`render_scene_v2()`](../chartground_edit/datasets/render_v2.py) 返回处，看图/mask 尺寸与 target index。
+- 常见错误：几何变换不同步、legend glyph 混入 mask、表达式不唯一。
+- 对应测试：[`test_v2_render_is_deterministic_and_masks_have_chart_semantics()`](../tests/test_synthetic_v2.py#L60)。
 
-### 22.2 读取与 split 门禁
+### A.2 Reader 与 split
 
-- 目的：从固定 manifest 取出本轮允许的 train 或 val，避免无意访问 test。
-- 输入：manifest 路径、split、可选 `allow_test`；实际类 [`Phase7V2SplitDataset`](../chartground_edit/training/data_adapter.py)。
-- 输出：`Phase4DataSample(image RGB, mask uint8[1,H,W], prompt P2, assistant_target)`。
-- 调用：训练桥 [`ChartGroundPhase4Dataset.__init__()`](../chartground_edit/training/sa2va_adapter.py) 选择 reader，再由 `prepare_data()` 调其 `__getitem__()`。
-- 设计缘由：reader 在模型构建之前校验 manifest SHA、split 数量、schema 与本地图像；默认 test-denied。
-- 常见错误：给 `split=test` 忘了显式冻结 test 授权；用 v1 manifest 搭 v2 代码；把 `full_instruction` 作为模型输入。
-- 测试/断点：[`test_phase7a_v2_projection.py`](../tests/test_phase7a_v2_projection.py)；观察 `len(records)`、`sample.prompt` 与 `sample.mask.shape`。
+- 输入：v2 manifest、指定 split。
+- 输出：单条样本的 RGB 图、`uint8[1,H,W]` GT、P2、assistant target。
+- 首个断点：[`Phase7V2SplitDataset.__init__()`](../chartground_edit/training/data_adapter.py#L160)，看 `records`、manifest hash、`allow_test`。
+- 常见错误：v1/v2 manifest 混用、误读 test、将 full instruction 输入模型。
+- 对应测试：[`test_phase7a_manifest_and_split_contract()`](../tests/test_phase7a_v2_projection.py#L67)。
 
-### 22.3 双路视觉预处理
+### A.3 双路图像
 
-- 目的：一份图供 MLLM 理解语义，另一份图供 SAM2 保留空间信息。
-- 输入：`PIL.Image RGB (W,H)`；[`Sa2VADatasetMixin._process_single_image()`](../../sa2va/datasets/base.py)。
-- 输出：MLLM `[N_tiles,3,448,448]` float tile、SAM2 `[3,1024,1024]` 原始像素 tensor、`num_image_tokens=N_tiles×256`。
-- 调用：`ChartGroundPhase4Dataset.prepare_data()` 调 `_process_single_image()`；后者分别调 [`dynamic_preprocess()`](../../sa2va/datasets/data_utils.py)、`DirectResize.apply_image()`。
-- 设计缘由：tile 适应宽高比并提供细节，SAM2 以统一画布产生 mask feature；两路不会互相提供 GT。
-- 常见错误：把 `N_tiles` 当固定 7、误以为 SAM2 的 1024 画布等同原图坐标、把 MLLM tile 当作 GT mask 尺寸。
-- 测试/断点：[`test_phase4b_alignment.py`](../tests/test_phase4b_alignment.py)；观察原图 `(W,H)`、tile 数、grounding 图 shape 与 dtype。
+- 输入：RGB `(W,H)`。
+- 输出：MLLM `[N_tiles,3,448,448]` 与 SAM2 `[3,1024,1024]`。
+- 首个断点：[`_process_single_image()`](../../sa2va/datasets/base.py#L121)，看 tile 数与 grounding image。
+- 常见错误：把 tile 数固定为 7；把 SAM2 画布当作原图坐标。
+- 对应测试：[`test_real_smoke_collator_is_strict_one_to_one()`](../tests/test_phase4b_alignment.py#L284)。
 
-### 22.4 Conversation、tokenizer 与 batch
+### A.4 Tokenizer 与 batch
 
-- 目的：把 P2、图像占位与 assistant target 变成监督序列，同时保留原图 GT mask。
-- 输入：`Phase4DataSample.conversation` 两个 role、`num_image_tokens`、tokenizer。
-- 输出：`input_ids/labels/attention_mask [B,L]`、`pixel_values` list、`g_pixel_values` list、`masks` list。
-- 调用：[`ChartGroundPhase4Dataset.prepare_data()`](../chartground_edit/training/sa2va_adapter.py) → [`Sa2VADatasetMixin.get_inputid_labels()`](../../sa2va/datasets/base.py) → [`tokenize_conversation()`](../../sa2va/datasets/data_utils.py) → [`chartground_sa2va_collect_fn()`](../chartground_edit/training/sa2va_adapter.py)。
-- 设计缘由：语言 labels 和分割对齐共用**真实** tokenizer 边界；不能拿字符串位置代替 token 位置。
-- 常见错误：误把 `<IMG_CONTEXT>` 当单个 tile、padding labels 非 -100、GT 已经被 resize 到 tile 画布。
-- 测试/断点：[`test_phase4b_alignment.py`](../tests/test_phase4b_alignment.py)；看 `len(input_ids)==len(labels)`、`attention_mask.sum()`、list 元素 shape。
+- 输入：P2/target conversation、tile 对应的 image token 数。
+- 输出：`input_ids/labels/attention_mask [B,L]` 与图像、GT list。
+- 首个断点：[`chartground_sa2va_collect_fn()`](../chartground_edit/training/sa2va_adapter.py#L106) 返回前。
+- 常见错误：忽略 padding label=-100，或误把一个 tile 当一个 image token。
+- 对应测试：[`test_real_adapter_model_boundary_excludes_audit_fields()`](../tests/test_phase4b_alignment.py#L310)。
 
-### 22.5 assistant `[SEG]` 严格选择
+### A.5 supervised `[SEG]` 对齐
 
-- 目的：把被监督的那个分割 token 与**同一样本**唯一 GT mask 配对。
-- 输入：`input_ids/labels long[B,L]`、seg token ID、`masks` list；公式见 §6。
-- 输出：`supervised_seg_mask bool[B,L]` 和逐样本 `alignment_records`（positions/count/sample ID）。
-- 调用：collator 调 [`select_supervised_seg_tokens()`](../chartground_edit/training/alignment.py)/`validate_strict_one_to_one()`；模型 [`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py) 再调 `select_seg_token_mask()`/`validate_strict_alignment()`。
-- 设计缘由：P2 自身含 `[SEG]`，但它属于 user span、label=-100；不许按出现顺序选，也不许静默修到 5。
-- 常见错误：0 或 2 supervised token、0 或 2 GT masks、labels 在不同 device、`long` 被误转 float。
-- 测试/断点：[`test_phase4b_alignment.py`](../tests/test_phase4b_alignment.py)；观察每个 `token_positions` 与失败异常中的 policy。
+- 输入：`input_ids/labels [B,L]`、GT mask list。
+- 输出：每样本一个 assistant SEG 位置、一个 GT；否则立即报错。
+- 首个断点：[`select_seg_token_mask()`](../../sa2va/models/sa2va.py#L186) 后，检查两个 SEG 的 label。
+- 常见错误：误选 user SEG、跨样本配对、`fix_number=5` 掩盖错配。
+- 对应测试：[`test_two_seg_tokens_select_only_supervised_assistant()`](../tests/test_phase4b_alignment.py#L67)。
 
-### 22.6 InternVL 语义前向
+### A.6 InternVL 语义前向
 
-- 目的：用视觉与文本共同上下文产生每个位置的最后层 hidden state 和语言 CE。
-- 输入：`input_ids[B,L]`、tile 拼接后的 `[ΣN_tiles,3,448,448]`、labels/attention mask。
-- 输出：`hidden_states[-1][B,L,1536]` 与 `llm_loss`；实际 L/N_tiles 运行时可变。
-- 调用：[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py) 调 [`InternVLMLLM.forward()`](../../sa2va/models/mllm/internvl.py)，后者调 `_llm_forward()` → `self.model.extract_feature()` → `language_model()` → `_compute_loss()`。
-- 设计缘由：`<IMG_CONTEXT>` token 对应处以视觉 embedding 替换，LLM 才能把“图例中虚线”与图像视觉信息关联。
-- 常见错误：visual embedding 个数与 image placeholder 个数不等；tokenizer/config revision 错配；认为 `llm_loss` 必须与 mask loss 同速下降。
-- 测试/断点：[`test_phase4b_alignment.py`](../tests/test_phase4b_alignment.py) 保输入契约；运行时在 `_embed_visual_features()` 看 selected 数与 `visual_embeds.shape[0]`。
+- 输入：`input_ids[B,L]`、`[T,3,448,448]` tile。
+- 输出：最后层 hidden `[B,L,1536]` 与语言 CE。
+- 首个断点：[`_embed_visual_features()`](../../sa2va/models/mllm/internvl.py#L269)，看占位数与 visual token 数。
+- 常见错误：tokenizer/config revision 错配，视觉 embedding 数不等于占位数。
+- 对应测试：[`test_real_smoke_collator_is_strict_one_to_one()`](../tests/test_phase4b_alignment.py#L284) 保护输入契约；该测试不构建完整 MLLM。
 
-### 22.7 projection 与 SAM2
+### A.7 projection 与 SAM2
 
-- 目的：把 1536 维 SEG 语义向量变成 256 维空间分割 prompt。
-- 输入：最后层 hidden `[B,L,1536]`、监督 mask、SAM2 图 `[B,3,1024,1024]`（单图 batch）。
-- 输出：单目标 projected embedding `[1,256]`，以及运行时空间尺寸的 mask logits。
-- 调用：[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py) 先投影再选择；调用 [`SAM2TrainRunner.get_sam2_embeddings()`](../../sa2va/models/sam2_train.py) 与 `inject_language_embd()`。
-- 设计缘由：LLM 的 token 表征不直接等于 SAM2 的 prompt 空间，分开学习桥可冻结大型视觉/语言权重。
-- 常见错误：错把整段 SAM2 包进 `no_grad()`；混淆 256 维 prompt 与 256×256 空间；不检查每样本只有一向量。
-- 测试/断点：[`test_phase4c_overfit.py`](../tests/test_phase4c_overfit.py)；看 `pred_embeddings`、`language_embeddings` 与 logits shape。
+- 输入：监督 SEG hidden `[1,1536]`、grounding 图。
+- 输出：`[1,256]` language prompt 与 mask logits。
+- 首个断点：[`SAM2TrainRunner.inject_language_embd()`](../../sa2va/models/sam2_train.py#L74)，看 sparse prompt 拼接前后的形状。
+- 常见错误：把 256 维 prompt 当空间图、将整个冻结 SAM2 放进 `no_grad()`。
+- 对应测试：[`test_phase4c_config_is_fixed_320_step_train_only()`](../tests/test_phase4c_overfit.py#L143) 保护 Strategy A 配置；SAM2 中间 shape 需运行时观察。
 
-### 22.8 loss、backward 与参数更新
+### A.8 Loss 与梯度
 
-- 目的：从语言 CE 与两项 mask loss 向 Strategy A/B 的目标参数传梯度，并拒绝非有限值。
-- 输入：语言 logits/labels、mask logits、原图 GT；GT nearest 到 logits 尺寸，uncertain points 12,544。
-- 输出：`llm_loss/loss_mask/loss_dice`、total loss、projection（B 另有 LoRA）grad、一次 optimizer step。
-- 调用：[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py) → [`run_phase4c_train.py::run()`](../scripts/run_phase4c_train.py) 或 [`run_phase7b_v2_lora.py::_one_step()`](../scripts/run_phase7b_v2_lora.py)。
-- 设计缘由：冻结参数不是删掉运算；梯度仍需穿过 SAM2 再到 projection。两组 param group 仅在 B 中出现。
-- 常见错误：把 batch size 1 误作 `N_tiles=1`、loss finite 但 grad=0、optimizer 包含冻结参数、执行意外第二次 step。
-- 测试/断点：[`test_phase7b_v2_lora.py`](../tests/test_phase7b_v2_lora.py)；检查 `gradient_norm`、`frozen` 列表、step 前后 tensor 差异。
+- 输入：language logits/labels、mask logits、nearest 对齐的 GT。
+- 输出：语言 CE、mask CE、Dice 与目标参数 grad。
+- 首个断点：[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L341) 返回 loss dict 前。
+- 常见错误：loss finite 但 grad=0、optimizer 含冻结权重、GT 与 logits 尺寸不符。
+- 对应测试：[`test_phase7b_config_is_frozen_and_test_disabled()`](../tests/test_phase7b_v2_lora.py#L73) 保护配置；真实 grad 需授权的训练 smoke 观察。
 
-### 22.9 HF 推理到 bool mask
+### A.9 HF 推理与 mask
 
-- 目的：在固定权重/remote code 上预测原图坐标的二值 mask，不依赖 GT。
-- 输入：用户 RGB 图、P2、checkpoint、adapter；HF `predict_forward` 内另构建 tile 与 SAM2 图。
-- 输出：`PredictionResult.mask` 为 `bool[H,W]` 或 `None`，附 raw shape、文本、failure reason。
-- 调用：[`run_chartground_edit.py::run()`](../scripts/run_chartground_edit.py) → [`Sa2VAInternVL3Backend.predict_prompt()`](../chartground_edit/inference/sa2va_backend.py) → HF `predict_forward()` → [`process_prediction_masks()`](../chartground_edit/inference/mask_processing.py)。
-- 设计缘由：remote code 结果是外部边界，必须先核验形状/值域，再交给编辑器或指标。
-- 常见错误：把 `[1,H,W]` 直接传二维 editor、把异常当合法空预测、对连续 logits 作“非零即前景”。
-- 测试/断点：[`test_inference.py`](../tests/test_inference.py)；观察 `raw_mask_metadata`、`mask_resized_nearest`、`failure_reason`。
+- 输入：原图、P2、固定 Sa2VA revision 与 adapter。
+- 输出：`PredictionResult.mask bool[H,W]`、raw metadata 或 failure reason。
+- 首个断点：[`Sa2VAInternVL3Backend.predict_prompt()`](../chartground_edit/inference/sa2va_backend.py#L176) 接收 raw 输出处。
+- 常见错误：`[1,H,W]` 未去 singleton、把异常与合法空 mask 混淆、对 logits 直接非零化。
+- 对应测试：[`test_leading_singletons_are_removed_but_ambiguous_shape_fails()`](../tests/test_inference.py#L113)。
 
-### 22.10 编辑、评测、保存
+### A.10 编辑、指标与保存
 
-- 目的：相同 predicted mask 同时驱动用户编辑和离线 GT 指标；GT 绝不进入 Demo CLI。
-- 输入：`bool[H,W]` predicted mask + RGB 原图；评测支另有同尺寸 GT。
-- 输出：RGB/RGBA 编辑图与 mask/overlay/JSON；评测支额外输出 IoU/Dice、16-group Macro 等。
-- 调用：Demo [`run()`](../scripts/run_chartground_edit.py) → [`edit()`](../chartground_edit/editing/editor.py)；冻结评测 [`_prediction_row()`](../scripts/run_phase7c_v2_frozen_test.py) → [`summarize()`](../scripts/run_phase7c_v2_frozen_test.py)。
-- 设计缘由：把用户功能与指标计算隔离，避免使用 GT 修正预测；所有失败/空结果仍计入预期 320 样本。
-- 常见错误：空 mask 用 GT 补、把 edit success 说成 mask 正确、从分母删失败样本、用 test 重新挑 checkpoint。
-- 测试/断点：[`test_editing.py`](../tests/test_editing.py)、[`test_phase7c_v2_frozen_test.py`](../tests/test_phase7c_v2_frozen_test.py)；对同一 sample ID 比较 `prediction.mask`、`intersection_pixels`、`edit_skipped_empty`。
+- 输入：原图与同尺寸预测 bool mask；指标分支另用 GT。
+- 输出：编辑图/JSON；离线分支另有 IoU/Dice 与组指标。
+- 首个断点：[`_prediction_row()`](../scripts/run_phase7c_v2_frozen_test.py#L329)，看 `prediction`、`intersection`、`edit_skipped`。
+- 常见错误：空 mask 用 GT 补、编辑成功被误说成分割正确、失败样本从分母删除。
+- 对应测试：[`test_only_strategy_b_runs_editor()`](../tests/test_phase7c_v2_frozen_test.py#L115)。
+
+## 附录 B：术语表
+
+| 术语 | 初学者应记住什么 | 本项目落点 |
+|---|---|---|
+| MLLM | 多模态大语言模型：在文本 token 序列里融合图像特征，产出带视觉上下文的语言 hidden state。 | InternVL3 经 `InternVLMLLM` 接入。 |
+| visual token | 一个图像局部的视觉向量，不是一张 tile，也不是一个像素。 | 一个 448 tile 在固定配置下形成 256 个。 |
+| tile | 动态切出的 448×448 图像块；数量依图像宽高比变化。 | MLLM 路输入，非 SAM2 的 1024 图。 |
+| hidden state | 某层网络在各 token 位置的向量表示；不是可读回答文本。 | assistant SEG 最后层向量为 1536 维。 |
+| logit | 归一化概率/阈值之前的实数分数。 | SAM2 mask head 的输出先是 mask logits。 |
+| prompt embedding | 作为分割解码器条件的向量。 | 256 维语言向量拼进 SAM2 sparse prompt。 |
+| GT mask | 数据集给出的目标真值二值图，仅用于训练 loss 或离线评测。 | 无 GT Demo 不读取它。 |
+| `[SEG]` | 分割目标的特殊 token；它的 hidden state 是语言→mask 的锚点。 | 训练只选 labels 非 -100 的 assistant token。 |
+| projection | 把一种特征空间映射到另一种的可学习层。 | `text_hidden_fcs`：1536→256。 |
+| LoRA | 冻结原权重，仅训练低秩增量 `BA` 的参数高效微调。 | Strategy B 的最后 8 层 q/k/v/o。 |
+| Macro IoU | 先逐组求 IoU 再平均，各组同权。 | 本项目主指标是 16 组 Macro。 |
+| Micro IoU | 先把所有样本交集/并集像素相加，再作比值；大目标权重更高。 | 与 Macro 可显著不同。 |
+| remote code | HF checkpoint 自带、由 `trust_remote_code=True` 执行的模型 Python 实现。 | 固定 Sa2VA revision；仓库 HF 镜像只供导航。 |
+| adapter | 依附于 base model 的少量增量权重，不能单独推理。 | 最终 adapter 是 4 个 projection + 64 个 LoRA tensor。 |

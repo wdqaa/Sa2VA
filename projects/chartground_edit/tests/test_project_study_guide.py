@@ -20,11 +20,18 @@ def _guide() -> str:
     return GUIDE.read_text(encoding="utf-8")
 
 
-def test_guide_has_all_chapters_five_mapped_diagrams_and_readme_entry() -> None:
+def test_guide_has_all_chapters_six_mapped_diagrams_and_readme_entry() -> None:
     guide = _guide()
     for index in range(22):
         assert re.search(rf"^## {index}\. ", guide, flags=re.MULTILINE)
-    assert guide.count("```mermaid\n") == 5
+    for heading in (
+        "### 16.1 训练样本",
+        "### 16.2 推理样本",
+        "## 附录 A：逐站排错速查表",
+        "## 附录 B：术语表",
+    ):
+        assert heading in guide
+    assert guide.count("```mermaid\n") == 6
     for suffix in guide.split("```mermaid\n")[1:]:
         assert re.search(r"\n```\n\n\| 节点", suffix)
         diagram = suffix.split("\n```", 1)[0]
