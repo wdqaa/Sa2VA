@@ -1,6 +1,6 @@
 # ChartGround-Edit 项目代码学习手册：从数据到 MLLM、SAM2 与图表编辑
 
-> 基于 `c3a5522` 审读源码。本手册是代码学习路线，不是运行报告。下文的模型形状若来自 Phase 4B 历史诊断会明确标出；仅靠静态源码无法确定的运行时值，不写成固定常数。所有路径相对于本仓库，链接从本文件所在的 `docs/` 目录解析。
+> 基于 `dace042` 审读源码。本手册是代码学习路线，不是运行报告。下文的模型形状若来自 Phase 4B 历史诊断会明确标出；仅靠静态源码无法确定的运行时值，不写成固定常数。所有路径相对于本仓库，链接从本文件所在的 `docs/` 目录解析。
 
 ## 0. 如何使用这份手册
 
@@ -16,6 +16,99 @@
 | 外部第三方 | XTuner、PEFT、SAM2 基础实现 | 只写本仓库可确认的调用接口，不猜内部行为 |
 
 第一次读代码建议按这个顺序：[`schema_v2.py`](../chartground_edit/datasets/schema_v2.py) → [`data_adapter.py`](../chartground_edit/training/data_adapter.py) → [`sa2va_adapter.py`](../chartground_edit/training/sa2va_adapter.py) → [`base.py`](../../sa2va/datasets/base.py) → [`data_utils.py`](../../sa2va/datasets/data_utils.py) → [`sa2va.py`](../../sa2va/models/sa2va.py) → [`internvl.py`](../../sa2va/models/mllm/internvl.py) → [`sam2_train.py`](../../sa2va/models/sam2_train.py) → [`sa2va_backend.py`](../chartground_edit/inference/sa2va_backend.py) → [`mask_processing.py`](../chartground_edit/inference/mask_processing.py) → [`editor.py`](../chartground_edit/editing/editor.py) → [`strategy_b.py`](../chartground_edit/training/strategy_b.py) → [`run_chartground_edit.py`](../scripts/run_chartground_edit.py)。
+
+### 0.1 先只记住一条最短主线
+
+如果你第一次看多模态分割代码，先不要同时理解 InternVL、LLM、SAM2、LoRA 和训练框架。先把一次单样本前向压缩成下面八句话：
+
+1. Dataset 读取一张图、一个“要找谁”的短句，以及训练时才有的 GT mask。
+2. 同一张图复制成两路：一路做成 InternVL 的 448 tile；一路缩放成 SAM2 的 1024×1024 输入。
+3. InternVL 把 tile 变成视觉 token，并用这些向量替换文本序列中的 `<IMG_CONTEXT>` 占位 token。
+4. LLM 接收已经混合图像和文本的 `inputs_embeds[B,L,1536]`，输出每个序列位置的最后层 hidden state `[B,L,1536]`。
+5. 训练只选 assistant 回答中的 `[SEG]` 位置；单目标时得到每个样本一个 1536 维向量。
+6. `text_hidden_fcs` 把 1536 维向量变成 SAM2 能接收的 256 维 language prompt。
+7. SAM2 一边保存图像的空间特征，一边让 language prompt 与这些空间特征通过 Two-Way Transformer 交互，最后输出 256×256 mask logits。
+8. 训练用 logits 与 GT 算 mask loss；推理把 logits 恢复到原图尺寸并阈值化，再由 editor 修改像素。
+
+```mermaid
+flowchart LR
+  A[① image + expression] --> B[② two image branches]
+  B --> C[③ visual/text inputs_embeds]
+  C --> D[④ LLM hidden 1536]
+  D --> E[⑤ assistant SEG]
+  E --> F[⑥ projection 256]
+  F --> G[⑦ SAM2 mask logits]
+  G --> H[⑧ loss or edit]
+```
+
+| 节点 | 第一次阅读对应源码 | 此时只需回答的问题 |
+|---|---|---|
+| ① | [`Phase7V2SplitDataset._load_sample()`](../chartground_edit/training/data_adapter.py#L219) | 图、表达式、mask 从哪里来？ |
+| ② | [`Sa2VADatasetMixin._process_single_image()`](../../sa2va/datasets/base.py#L121) | 为什么一张图要预处理两次？ |
+| ③ | [`InternVLMLLM._embed_visual_features()`](../../sa2va/models/mllm/internvl.py#L269) | visual token 替换了哪些文本占位？ |
+| ④–⑤ | [`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L341) | 为什么只取 assistant `[SEG]`？ |
+| ⑥ | [`Sa2VAModel.text_hidden_fcs`](../../sa2va/models/sa2va.py#L84) | 1536 为什么要变成 256？ |
+| ⑦ | [`SAM2Base._forward_sam_heads()`](../../sa2va/models/extension/sam2_base.py#L112) | 语言 token 在哪里与图像 feature 相遇？ |
+| ⑧ | [`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L406)、[`edit()`](../chartground_edit/editing/editor.py#L39) | 当前是在训练还是推理？ |
+
+后文所有章节都只是在展开这八步。读到不懂的地方，先判断它属于哪一步，不要立刻钻进第三方模型的每一层。
+
+### 0.2 张量形状怎么读
+
+本手册大量使用 `[B,L,D]`、`[B,C,H,W]`。方括号不是某个具体 tensor 的变量名，而是在写各维含义：
+
+| 符号 | 含义 | 本项目例子 |
+|---|---|---|
+| `B` | batch size，一次并行处理几个样本 | 正式训练是 1，但代码必须支持 batch 维 |
+| `L` | 语言序列长度 | Prompt、图像占位、assistant target 和 padding 合计；随样本变化 |
+| `D` | token 向量维度 | InternVL3 LLM hidden size 为 1536 |
+| `T` | 一个 batch 合计的动态 tile 数 | Phase 4B smoke 历史观测为 7，不是固定值 |
+| `C` | 图像 feature channel 数 | SAM2 主 feature 是 256 通道 |
+| `H,W` | 当前坐标空间的高和宽 | 原图、1024 画布、64 feature map、256 logits 各不相同 |
+| `N` | 某类 token、对象或点的数量 | 单目标 supervised SEG 数量为 1 |
+| `M` | SAM2 候选 mask 数 | 当前首次无点击路径会产生 3 个候选再选一个 |
+
+例如 `input_ids[B,L]` 中每个元素只是词表里的整数编号；它没有 1536 维语义。查 embedding table 后才得到 `inputs_embeds[B,L,1536]`。LLM 输出 `hidden_states[B,L,1536]`；再经过 `text_hidden_fcs` 才得到 `[B,L,256]`。因此不要说“MLLM 直接得到 `[B,L,256]`”：**1536 是 LLM 空间，256 是 SAM2 prompt 空间**。
+
+还有两个常见阅读误区：
+
+- `PIL.Image.size` 的顺序是 `(W,H)`；PyTorch 图像 tensor 通常是 `[C,H,W]`。
+- reshape 只改变观察方式，不学习参数；`Linear`、卷积、attention 会用参数改变特征。
+
+### 0.3 同一张图涉及四套坐标，不要混用
+
+| 坐标/特征空间 | 典型形状 | 用途 | 能否直接和原图像素一一对应 |
+|---|---|---|---|
+| 原图 | RGB `[H,W,3]`，GT `[1,H,W]` | 保存、编辑、最终评测 | 可以 |
+| InternVL tile | `[N_tiles,3,448,448]` | 让 MLLM 看图并理解指代 | 不可以；有动态切片和缩放 |
+| SAM2 输入画布 | `[B,3,1024,1024]` | 提取 grounding 空间 feature | 是原图的统一缩放版，但仍不是最终输出尺寸 |
+| SAM2 feature/logit | feature `[B,256,64,64]`，logit `[B,1,256,256]` | mask decoder 内部计算 | 需要插值回原图 |
+
+这解释了为什么系统不是“InternVL 直接输出 mask”：InternVL 的 visual token 更适合语义，SAM2 的 feature map 保留了专门用于分割的空间结构。它们通过 256 维 language prompt 汇合，而不是共享同一张 feature map。
+
+### 0.4 三个名字里都有“映射”，但不是一回事
+
+初学时最容易把下面三类层混为一谈：
+
+| 名称 | 输入 → 输出 | 所属模块 | 是否由最终 Strategy B 训练 |
+|---|---|---|---|
+| InternVL `mlp1` | pixel-shuffle 后视觉通道 4096 → LLM hidden 1536 | MLLM 图像进入语言的桥 | 否，冻结 |
+| `text_hidden_fcs` | LLM `[SEG]` hidden 1536 → SAM2 prompt 256 | Sa2VA 语言进入分割的桥 | 是，四个 tensor |
+| LoRA `A/B` | 给 LLM 最后 8 层 attention 权重增加低秩增量 | LLM 内部 q/k/v/o | Strategy B 训练 |
+
+用户问“projection 在哪里”时，本项目默认指第二行的 `text_hidden_fcs`，不是 InternVL `mlp1`，也不是 LoRA。
+
+### 0.5 哪些是官方结构，哪些是本项目工作
+
+ChartGround-Edit 没有另造一个新的 mask decoder。InternVL → `[SEG]` → `text_hidden_fcs` → SAM2 是 Sa2VA 的基本结构。本项目在主线中做的是：
+
+- 构造并审计图表领域 synthetic_v1/v2 数据；
+- 固定 P2，把模型输入限定为 referring expression；
+- 修正本项目 Prompt 出现双 `[SEG]` 后的训练 token-mask 对齐；
+- 用 projection-only 和最后 8 层 attention LoRA 做受控适配；
+- 实现严格 adapter identity、离线评测和 predicted-mask 编辑闭环。
+
+它**没有**加入显式“图例 glyph → 曲线”匹配模块，也没有替换专门面向细线/散点的 SAM2 decoder。冻结结果中 `line/trend` 仍弱，256/320 个 v2 test 样本 IoU<0.5。因此手册后面解释的是“当前代码如何工作”，不是声称架构已经从根本上解决所有科学图表难点。
 
 ## 1. 项目解决什么问题
 
@@ -126,6 +219,20 @@ flowchart TB
 
 Reader 在 `_load_sample()` 中打开 RGB 图与 `L` mask，把 `{0,255}` 转为 `uint8 [1,H,W]` 的 0/1，构造 P2 与 `Sure, [SEG].`。`prepare_data()` 再核查尺寸、二值和非空；MLLM 路产生动态 tile `pixel_values[N_tiles,3,448,448]`，SAM2 路经 `DirectResize.apply_image()` 产生 `g_pixel_values[3,1024,1024]`，但 GT 仍保留原图 `H×W`。`_process_conversations_for_encoding()` 将 `<image>` 扩展成 `<img><IMG_CONTEXT>…</img>`；`get_inputid_labels()` 经过 XTuner conversation template 与 [`tokenize_conversation()`](../../sa2va/datasets/data_utils.py)。
 
+把这段调用拆开看，一条记录先后经历以下状态：
+
+1. `Phase7V2SplitDataset._load_sample(index)` 读 JSON dict。它只把 `referring_expression` 放进 P2；`full_instruction`、action 和审计元数据不进入模型。
+2. `Image.open(...).convert("RGB")` 得到原图；mask 以灰度 `L` 打开，转 NumPy 后检查值域，再变为 `[1,H,W]` 的 tensor。开头的 `1` 表示“一张目标 mask”，不是 RGB channel。
+3. `_load_sample()` 返回的 conversation 逻辑上是 human=P2、assistant=`Sure, [SEG].`。此时还是字符串，尚无 token ID。
+4. `ChartGroundPhase4Dataset.prepare_data(index)` 把样本交给 `Sa2VADatasetMixin`。这里对同一张原图分别构造 `pixel_values` 和 `g_pixel_values`。
+5. `_process_single_image()` 用动态切片 transform 生成若干 tile。一个 tile 不是一个 token；固定配置下一个 tile 稍后会成为 256 个 visual tokens。
+6. 同一方法用 `grounding_image_processor` 生成 SAM2 的 1024 方图。GT 不跟着强制变成 1024；它保留原图分辨率，直到算 loss 时才对齐到 logits。
+7. `_process_conversations_for_encoding()` 根据 tile 数，把原始 `<image>` 占位展开为足够数量的 `<IMG_CONTEXT>`。若有 7 个 tile，就是 7×256=1792 个图像上下文 token。
+8. `get_inputid_labels()` 把 conversation template、system/human/assistant 分隔符一起 tokenize，得到一维 `input_ids[L]` 与 `labels[L]`。
+9. `chartground_sa2va_collect_fn()` 先做 strict 1:1 检查，再调用官方 `sa2va_collect_fn()` padding；batch size 1 后文本字段多一维成为 `[1,L]`，图像和 mask 仍按 list 保留。
+
+为什么图像字段保留 list，而文本可以直接 stack？因为不同宽高比产生不同 `N_tiles`，`pixel_values` 的第一维不一定相等；原图尺寸也不同，所以 GT `[1,H,W]` 不能在 collate 时直接堆成一个规则 tensor。模型前向会在合适的位置拼 tile，而不会把不同尺寸的 GT 强行 padding 成同一尺寸。
+
 | batch `data` 字段 | 源码契约 / 典型形状 | dtype | 消费者 |
 |---|---|---|---|
 | `input_ids` | `[B,L]`，L 随文字和 tile 数变 | `long` | MLLM、SEG 选择 |
@@ -144,6 +251,29 @@ Reader 在 `_load_sample()` 中打开 RGB 图与 `L` mask，把 `{0,255}` 转为
 
 P2 `target_only_zh` 固定在 [`PROMPT_TEMPLATES`](../chartground_edit/inference/prompt_variants.py)：`<image>请分割图中由以下指代表达式指定的图表元素：{referring_expression}\n请使用 [SEG] 标记返回分割掩码。`。训练助手目标固定为 [`ASSISTANT_TARGET`](../chartground_edit/training/data_adapter.py) 的 `Sure, [SEG].`。两边均有一个 `[SEG]`，但仅助手目标需要监督。[`tokenize_conversation()`](../../sa2va/datasets/data_utils.py) 对 human span 写 `labels=-100`，对 assistant span 写 token ID；[`InternVLMLLM._compute_loss()`](../../sa2va/models/mllm/internvl.py) shift logits/labels 算 causal CE。
 
+先区分 `input_ids` 与 `labels`。二者形状相同，但职责不同：
+
+| 序列区域 | `input_ids` 里是什么 | `labels` 里是什么 | 语言 CE 是否监督 |
+|---|---|---|---|
+| system / human Prompt | 实际 token ID | `-100` | 否 |
+| `<IMG_CONTEXT>` | 图像占位 token ID | `-100` | 否 |
+| assistant target | `Sure, [SEG].` 的实际 token ID | 同一目标 token ID | 是 |
+| batch padding | pad token ID | `-100` | 否 |
+
+`labels=-100` 不是把 token 从输入删掉。user Prompt 仍然被 LLM 看到，只是 `CrossEntropyLoss` 不要求模型在这些位置预测下一个 token。换句话说：`input_ids` 决定“模型看什么”，`labels` 决定“哪些位置计算语言监督”。本项目又复用这条监督边界，决定哪个 `[SEG]` 代表 GT mask。
+
+可以把双 `[SEG]` 的一小段抽象为：
+
+```text
+位置       ... user_SEG ... assistant_SEG ...
+input_ids  ... 151674   ... 151674        ...
+labels     ... -100     ... 151674        ...
+原选择     ... true     ... true          ...
+新选择     ... false    ... true          ...
+```
+
+P2 中 user `[SEG]` 只是自然语言格式要求的一部分；Sa2VA 真正用于 mask 的语义锚点应是 assistant 输出位置。就模型结构而言，user Prompt 并非必须包含 `[SEG]`，官方问题模板通常也不把它写进问题。本项目没有在冻结实验中删掉它，因为 P2 identity 已预注册；工程上改用 labels-aware 选择，使 Prompt 文案是否出现同名 token 不再破坏监督边界。
+
 Phase 4B 历史真实 tokenizer 诊断（**v1 smoke1，不是 v2 观测**）见 [`phase4b_alignment_protocol.md`](phase4b_alignment_protocol.md)：`cgev1_bar_category_6d51bac154` 的 `seg_token_idx=151674`，`L=1844`；user `[SEG]` 在位置 1823、label -100，assistant 在位置 1840、label 151674。原条件 `input_ids == seg_token_idx` 选两处。旧 [`check_obj_number(...,fix_number=5)`](../../sa2va/models/sa2va.py) 先把 2 token/1 mask 静默截成 1/1，再重复到 5/5；甚至可能留下错误的 user token。不能选“最后一个”或“第二个”——Prompt 或 target 的 token 个数/顺序会变化。
 
 ```python
@@ -158,35 +288,142 @@ assert per_sample_seg_count == per_sample_gt_count == 1
 
 ## 7. InternVL3 MLLM 在这里做什么
 
-### 7.1 视觉 token 如何进入语言序列
+### 7.1 先区分 ID、embedding、hidden state 和 logit
 
-训练 [`InternVLMLLM.forward()`](../../sa2va/models/mllm/internvl.py) 把 list tile 拼成 `[ΣN_tiles,3,448,448]`，[`_llm_forward()`](../../sa2va/models/mllm/internvl.py) 先取语言 embedding，再调用 InternVL `extract_feature()`。仓库 HF 镜像中的 [`Sa2VAChatModel.extract_feature()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 明确是 `vision_model` → 去 CLS → 方格 reshape → `pixel_shuffle(scale=0.5)` → `mlp1`。训练 wrapper 调用 `self.model.extract_feature`；[`_embed_visual_features()`](../../sa2va/models/mllm/internvl.py) 用 `img_context_token_id` 选中的位置替换成视觉向量，然后 LLM 接受统一的 `inputs_embeds[B,L,D_lm]`。
+一条文本在模型中会出现四种容易混淆的表示：
 
-本固定配置的 `D_lm=1536`、vision hidden=1024、448 输入和 14 patch 来自固定 base/checkpoint 的配置文件（外部固定 revision；仓库内也可见 [`phase7b_v2_lora.py`](../configs/phase7b_v2_lora.py) 的 28 decoder layers 契约）。`N_visual = N_tiles × patch_token`，而 `patch_token=(448/14)^2×0.5^2=256`，所以若 N_tiles=7 则图像占位 token 为 1792。tile 数受宽高比和配置影响；不是每图 7。`L` 包含 Prompt、图像占位和回答，batch padding 后可变。
+| 名称 | 例子 shape | 它是什么 | 它不是什么 |
+|---|---|---|---|
+| `input_ids` | `[B,L]` | tokenizer 查词表得到的整数编号 | 不是语义向量 |
+| `inputs_embeds` | `[B,L,1536]` | embedding table 查出的连续向量，部分位置会被视觉向量覆盖 | 还没经过 28 层 LLM |
+| `hidden_states[-1]` | `[B,L,1536]` | 最后一层对每个位置的上下文表示，已经融合前文和图像 | 不是词表概率，也不是 mask |
+| language logits | `[B,L,V]` | 每个位置预测词表 `V` 中下一个 token 的未归一化分数 | 不送入 SAM2 |
 
-下面按实际 [`extract_feature()`](../../sa2va/hf/models/modeling_sa2va_chat.py#L222) 与训练 [`_llm_forward()`](../../sa2va/models/mllm/internvl.py#L135) 的先后顺序列 shape。`T=ΣN_tiles`；表中 448/14/1024/1536/0.5 属于固定 checkpoint 配置，`B/L/T` 是运行时变量。`32×32` 和 `16×16` 是这些配置值的推导，不是额外保存的中间 tensor。
+所以 `[SEG] hidden` 不是 token ID 151674，也不是字符串 `"[SEG]"`。它是最后层 hidden tensor 中 `[SEG]` 位置那一行 1536 维浮点数。相同 token ID 在不同图像、不同句子中会得到不同 hidden，因为上下文注意力已经改变了它。
+
+### 7.2 文本骨架先占位，再把视觉向量填进去
+
+模型不会把 `[T,3,448,448]` 图像 tensor 直接和 `[B,L]` token ID 拼接。实际过程是：
+
+1. tokenizer 先把 conversation 变成 `input_ids[B,L]`。
+2. 文本 embedding table 把每个 ID 查成 1536 维，得到 `input_embeds[B,L,1536]`。
+3. 图像位置目前只是重复的 `<IMG_CONTEXT>` ID；它们查到的普通 token embedding 只是临时占位。
+4. vision encoder 独立把每个 tile 变成 256 个 1536 维 visual embeddings。
+5. `_embed_visual_features()` 找出全部 `<IMG_CONTEXT>` 位置，原地把临时 token embedding 替换成 visual embeddings。
+6. 替换后的序列仍是 `[B,L,1536]`，因此普通 decoder-only LLM 可以直接接收 `inputs_embeds`。
+
+一个极小的概念示例：
+
+```text
+token 位置:   [BOS] [IMG_1] [IMG_2] ... [文本“曲线”] ... [SEG]
+替换前:       文本向量  占位向量 占位向量      文本向量          文本向量
+替换后:       文本向量  视觉向量1 视觉向量2     文本向量          文本向量
+进入 LLM:                 统一形状 [B,L,1536]
+```
+
+这里的 `[IMG_1]` 只是帮助理解；源码实际重复同一个 `<IMG_CONTEXT>` token ID，并靠位置不同承载不同 visual embeddings。
+
+### 7.3 一个 448 tile 为什么变成 256 个 visual tokens
+
+训练 [`InternVLMLLM.forward()`](../../sa2va/models/mllm/internvl.py#L252) 把 batch 内 list tile 拼成 `[T,3,448,448]`，其中 `T=ΣN_tiles`。固定 checkpoint 的 vision patch size=14，所以一个 tile 先形成 `32×32=1024` 个 patch，另有一个 CLS token：
+
+```text
+448 / 14 = 32
+32 × 32 = 1024 patch tokens
+vision encoder 输出包含 CLS，所以 token 数 = 1025
+```
+
+[`extract_feature()`](../../sa2va/hf/models/modeling_sa2va_chat.py#L222) 删掉 CLS，把 1024 个位置还原成 `32×32` 网格。`pixel_shuffle(scale=0.5)` 并不是丢掉四分之三信息，而是把相邻 `2×2` 的四个位置收进 channel：空间从 `32×32` 变成 `16×16`，通道从 1024 变成 4096。随后 `mlp1` 把 4096 映射到 LLM hidden 1536。最终一个 tile 得到 `16×16=256` 个 visual tokens。
+
+```mermaid
+flowchart LR
+  A[① tile 3x448x448] --> B[② ViT 1025x1024]
+  B --> C[③ remove CLS 32x32x1024]
+  C --> D[④ pixel shuffle 16x16x4096]
+  D --> E[⑤ mlp1 256x1536]
+  E --> F[⑥ replace IMG_CONTEXT]
+  F --> G[⑦ LLM BxLx1536]
+  G --> H[⑧ assistant SEG hidden]
+```
+
+| 节点 | 源码 | 本配置中的形状变化 |
+|---|---|---|
+| ① | [`dynamic_preprocess()`](../../sa2va/datasets/data_utils.py) | 每个 tile `[3,448,448]`；tile 数运行时可变 |
+| ②–⑤ | [`Sa2VAChatModel.extract_feature()`](../../sa2va/hf/models/modeling_sa2va_chat.py#L222) | `[T,1025,1024] → [T,256,1536]` |
+| ④ | [`Sa2VAChatModel.pixel_shuffle()`](../../sa2va/hf/models/modeling_sa2va_chat.py#L206) | `[T,32,32,1024] → [T,16,16,4096]` |
+| ⑥ | [`InternVLMLLM._embed_visual_features()`](../../sa2va/models/mllm/internvl.py#L269) | 必须正好替换 `T×256` 个位置 |
+| ⑦ | [`InternVLMLLM._llm_forward()`](../../sa2va/models/mllm/internvl.py#L135) | 统一 `inputs_embeds[B,L,1536]` |
+| ⑧ | [`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L341) | 最后层 `[B,L,1536]` 中选择目标位置 |
+
+完整张量变化表如下。`32×32` 和 `16×16` 是固定配置推导值，不表示仓库保存了两个额外文件。
 
 | 变化节点 | shape（本固定配置） | 固定性与依据 |
 |---|---|---|
-| dynamic tile 输入 | `[T,3,448,448]` | `T` 运行时可变；448 配置固定；[`dynamic_preprocess()`](../../sa2va/datasets/data_utils.py) |
-| vision encoder 输出，含 CLS | `[T,1025,1024]` | 1025=`(448/14)²+1`、1024 配置固定；[`extract_feature()`](../../sa2va/hf/models/modeling_sa2va_chat.py#L222) 读取所选层；具体激活值未记录 |
-| 去 CLS | `[T,1024,1024]` | 源码 `[:,1:,:]` 固定；同上 |
-| spatial reshape | `[T,32,32,1024]` | 32 由 patch 网格推导；同上 |
-| `pixel_shuffle(0.5)` | `[T,16,16,4096]` | scale 配置固定；[`pixel_shuffle()`](../../sa2va/hf/models/modeling_sa2va_chat.py#L206) 将空间 2×2 收进通道 |
-| 展平并过 `mlp1` | `[T,256,1536]` | 256/1536 配置固定；[`extract_feature()`](../../sa2va/hf/models/modeling_sa2va_chat.py#L222) |
-| visual token 展平 | `[T×256,1536]` | `T` 运行时可变；[`_process_visual_prompts()`](../../sa2va/models/mllm/internvl.py#L215) 无 object prompt 时 reshape |
-| 替换 `<IMG_CONTEXT>` | 被替换位置数应等于 `T×256` | [`_embed_visual_features()`](../../sa2va/models/mllm/internvl.py#L269) 以 token ID 选择位置；不改变序列长度 |
-| LLM `inputs_embeds` | `[B,L,1536]` | `B/L` 运行时可变；[`_llm_forward()`](../../sa2va/models/mllm/internvl.py#L135) |
-| final hidden state | `[B,L,1536]` | hidden 维配置固定，`B/L` 可变；[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L341) 取最后层 |
-| assistant `[SEG]` hidden | strict 单目标时每样本 `[1,1536]` | 数量由 labels-aware 契约固定为 1；值与实际生成位置运行时可变；模型先对全序列投影再取位置 |
+| dynamic tile 输入 | `[T,3,448,448]` | `T` 运行时可变；448 配置固定 |
+| vision encoder 输出，含 CLS | `[T,1025,1024]` | 1025=`(448/14)²+1`；vision hidden 1024 配置固定 |
+| 去 CLS | `[T,1024,1024]` | 源码固定的 `[:,1:,:]` |
+| spatial reshape | `[T,32,32,1024]` | 由 1024 patch 数的平方根得到 |
+| `pixel_shuffle(0.5)` | `[T,16,16,4096]` | downsample ratio 配置固定 |
+| flatten + `mlp1` | `[T,256,1536]` | 256 与 LLM hidden 1536 配置固定 |
+| visual token 展平 | `[T×256,1536]` | `T` 运行时可变 |
+| `<IMG_CONTEXT>` 位置 | `[T×256]` 个 true | 与 visual token 数必须相等 |
+| LLM `inputs_embeds` | `[B,L,1536]` | `B/L` 运行时可变 |
+| final hidden state | `[B,L,1536]` | 1536 配置固定 |
+| projection 后全序列 | `[B,L,256]` | 当前训练源码先投影全序列 |
+| 选择后的 assistant `[SEG]` | 总体 `[B,256]`；逐样本 `[1,256]` | strict 单目标时每样本恰好一个 |
 
-Phase 4B 的 **v1 smoke1 历史观测**是 `T=7`、`L=1844`、`B=1`，因此该诊断对应 1792 个 visual token；它不是 Phase 7C test 样本的实测 tile/hidden shape。HF 推理的生成阶段由 [`predict_forward()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 提取 `[SEG]`，不能把训练表中的 `labels` 选择直接套到生成路径。
+Phase 4B 的 **v1 smoke1 历史观测**是 `B=1`、`T=7`、`L=1844`。因此它有 1792 个 visual token，并可写成：
 
-### 7.2 `[SEG]` hidden state 怎样成为目标向量
+```text
+tile tensor                  [7,3,448,448]
+每 tile 的 visual embedding  [7,256,1536]
+展平 visual embedding        [1792,1536]
+整个 LLM 输入                [1,1844,1536]
+整个 LLM 最后层输出          [1,1844,1536]
+整个 projection 输出         [1,1844,256]
+选中 assistant SEG           [1,256]
+SAM2 接口再补 token 维       [1,1,256]
+```
 
-训练 `output.hidden_states[-1]` 形如 `[B,L,1536]`；[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py) **先对全序列**施加 `text_hidden_fcs`，再以监督 mask 取出 `[N_supervised,256]`。它依据助手标签边界，不依据回答字符串位置。推理不同：HF [`predict_forward()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 调用 `generate(...,output_hidden_states=True)`，[`get_seg_hidden_states()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 按生成 `output_ids==seg_id` 提取生成阶段 hidden，再投影。`Sure, [SEG].` 是训练 target，推理回答不保证逐字相同；有 `[SEG]` 也不保证定位正确。
+只有前面的 token/tile 位置由历史诊断真实记录；中间 hidden 数值未保存。不要把 `T=7`、`L=1844` 套到所有 v2 图片。
 
-### 7.3 两套路径，不能互换源码假设
+### 7.4 LLM 到底怎样让 `[SEG]` 表示“目标曲线”
+
+LLM 的 self-attention 允许 `[SEG]` 位置读取它之前的 Prompt token 和 visual token。训练时 target 已包含 `[SEG]`，这叫 teacher forcing：模型不用先采样出它，整个 target 序列作为输入右移参与 next-token 训练。最后一层 `[SEG]` hidden 因此包含：
+
+- 当前指代表达式的文本条件；
+- visual token 中的图表内容；
+- LLM 通过训练形成的“这个位置要承载分割目标”语义。
+
+但它仍是一个**全局语义提示向量**，不是 256×256 空间 mask。空间细节保存在另一条 SAM2 image feature 路。后面 mask decoder 要用 cross-attention 让这个提示去查询图像位置。
+
+“回答里出现 `[SEG]`”只证明语言模型输出了约定 token。它不证明 hidden 正确编码了目标：向量可能表示错系列，SAM2 也可能只恢复一部分线段。因此正式评测把 `segmentation_token_present` 与 IoU/Dice 分开。
+
+### 7.5 当前训练源码为何先投影全序列再选择
+
+[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L368) 的真实顺序是：
+
+```python
+hidden_states = output.hidden_states
+hidden_states = self.text_hidden_fcs(hidden_states[-1])  # [B,L,1536] -> [B,L,256]
+pred_embeddings = hidden_states[seg_token_mask]          # [N_supervised,256]
+```
+
+因此不是先得到 `[B,1536]` 再调用 projection；代码对每个 token 独立应用同一个 MLP，然后用 bool mask 取行。由于 `text_hidden_fcs` 不在 token 维混合信息，只对单行最后一维做映射，所以在数学上与“先选行、再投影”得到相同目标行。写调试脚本时仍应遵从真实顺序，以免误读断点形状。
+
+strict 单目标、batch size 为 `B` 时，布尔索引将各样本目标暂时摊平成 `[B,256]`。`seg_token_counts` 记录每个样本数量，`torch.split` 再恢复成长度 B 的 list，每项 `[1,256]`；`generate_video_pred_embeddings()` 按 frame/object 组织后，`torch.cat(... )[:,None]` 得到送入 SAM2 的 `[B,1,256]`。
+
+### 7.6 训练与推理的 `[SEG]` 来源不同
+
+训练时完整 conversation 已知，`labels` 能区分 user 与 assistant，因此使用：
+
+```text
+(input_ids == seg_token_idx) AND (labels != -100)
+```
+
+推理时没有 GT assistant target，也没有用于选择的训练 labels。HF [`predict_forward()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 调用 `generate(...,output_hidden_states=True)`，模型自回归生成回答；[`get_seg_hidden_states()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 再按生成 `output_ids==seg_id` 取对应生成 hidden。训练的 labels-aware 逻辑不能原样套到推理，也没有改动既有 `predict_forward`。
+
+### 7.7 两套实现路径，不能互换源码假设
 
 训练是 MMEngine/XTuner 配置 → [`ChartGroundStrategyBModel`](../chartground_edit/training/strategy_b.py) → [`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py) → [`InternVLMLLM._llm_forward()`](../../sa2va/models/mllm/internvl.py)。项目 Phase 7A/B 正式训练由 [`run_phase4c_train.py::run()`](../scripts/run_phase4c_train.py) 与 [`run_phase7b_v2_lora.py::run_train()`](../scripts/run_phase7b_v2_lora.py) 自行执行优化循环；[`tools/train.py`](../../../tools/train.py) 仅把 CLI 委托给 XTuner `train.main()`，**不是 Phase 7A/B 的直接运行入口**。
 
@@ -195,6 +432,16 @@ Phase 4B 的 **v1 smoke1 历史观测**是 `T=7`、`L=1844`、`B=1`，因此该�
 ## 8. `[SEG]` 到 SAM2 的桥：`text_hidden_fcs`
 
 [`Sa2VAModel.__init__()`](../../sa2va/models/sa2va.py) 定义 `Linear(1536,1536) → ReLU → Linear(1536,256) → Dropout(0.0)`；输出 256 对齐 [`SAM2TrainRunner.hidden_dim`](../../sa2va/models/sam2_train.py)。四个 trainable tensor 形状与参数数：
+
+对一条 `[SEG]` 向量 `h∈R^1536`，它实际计算：
+
+```text
+z1 = h · W1^T + b1       # 1536 -> 1536
+z2 = ReLU(z1)            # 负数截为 0，shape 不变
+p  = z2 · W2^T + b2      # 1536 -> 256
+```
+
+`p` 就是后文的 `language_embd`。这一步不会产生空间维度，也不会知道哪个 256×256 像素应为前景；它只把 LLM 的坐标系翻译到 SAM2 prompt 的坐标系。空间位置必须由 `p` 与 SAM2 image feature 的注意力交互决定。
 
 | key | shape | elements |
 |---|---:|---:|
@@ -234,47 +481,307 @@ HF 推理实现不同：[`SAM2.get_sam2_embeddings()`](../../sa2va/hf/models/sam
 
 ### 9.2 分辨率与输出
 
-[`DirectResize.apply_image()`](../../sa2va/models/preprocess/image_resize.py) 把整张图缩为 1024 正方形；[`SAM2TrainRunner.preprocess_image()`](../../sa2va/models/sam2_train.py) 除以 255 后用 ImageNet 均值方差标准化。训练 mask head 给低分辨率 logits，实际空间尺寸由运行时 `pred_masks[0].shape[-2:]` 决定；[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py) 用 nearest 把 GT resize 到该尺寸后算 loss。历史代码中的 `_get_pesudo_data()` 有 256×256 伪 mask，但**不能把它当所有真实 logits 固定尺寸的证据**。
+先给结论：当前训练配置中，SAM2 接收 `g_pixel_values[B,3,1024,1024]`，最终供 loss 使用的是 `pred_masks[B,1,256,256]`。中间主图像 feature 为 `[B,256,64,64]`，语言 prompt 为 `[B,1,256]`。语言向量不会直接相加到所有图像像素，而会追加为 sparse prompt token，通过 mask decoder 的双向注意力和图像 token 交互。
 
-HF [`predict_forward()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 把 SAM2 输出以 bilinear 恢复原图 `(H,W)`，再 `sigmoid()>0.5`，返回 NumPy bool mask（通常含 leading singleton）。项目后处理只做协议检查与必要的 nearest 几何恢复，不会用 GT 修改结果。训练的 GT resize 与推理的 logits resize方向相反：前者为 loss 对齐，后者为用户输出。
+下面从 1024 图像开始，不省略中间来源。
 
-单图训练的内部调用不是“把语言向量加到 image feature”：[`get_sam2_embeddings()`](../../sa2va/models/sam2_train.py#L108) 先调用 SAM2 `forward_image()`/`_prepare_backbone_features()`；[`inject_language_embd()`](../../sa2va/models/sam2_train.py#L74) 将最后一级视觉 feature 加 `no_mem_embed` 后 reshape 为 `backbone_features`，再把 `language_embd` 单独传给扩展的 [`SAM2Base._forward_sam_heads()`](../../sa2va/models/extension/sam2_base.py#L112)。该方法用一个 label=-1 的空 point 调 `sam_prompt_encoder`，得到 `sparse_embeddings` 与 `dense_embeddings`；没有 mask 输入时，dense 支路使用 prompt encoder 的 learned `no_mask_embed`。**256 维语言向量是沿 sparse prompt 的 token 维拼接**（`torch.cat(...,dim=1)`），不是像素图、不是 dense mask prompt。视觉和语言首次汇合在 `sam_mask_decoder(image_embeddings=backbone_features, sparse_prompt_embeddings=..., dense_prompt_embeddings=..., high_res_features=...)`。
+#### 9.2.1 1024 图像如何变成三层 SAM2 feature
+
+[`DirectResize.apply_image()`](../../sa2va/models/preprocess/image_resize.py) 先把原图直接缩成 1024×1024。训练 [`preprocess_image()`](../../sa2va/models/sam2_train.py#L66) 做：
+
+```text
+uint8/float 像素 [B,3,1024,1024]
+→ 除以 255
+→ 按 ImageNet mean/std 逐通道标准化
+→ 标准化图像 [B,3,1024,1024]
+```
+
+[`get_sam2_embeddings()`](../../sa2va/models/sam2_train.py#L108) 调用 SAM2 `forward_image()`。固定 [`sam2_hiera_l.yaml`](../../../third_parts/sam2/sam2_configs/sam2_hiera_l.yaml) 使用 Hiera-L：初始 [`PatchEmbed`](../../../third_parts/sam2/modeling/backbones/utils.py#L65) 是 kernel 7、stride 4、padding 3、输出 144 通道，因此：
+
+```text
+[B,3,1024,1024]
+→ Conv2d stride 4
+→ [B,144,256,256]
+→ permute
+→ [B,256,256,144]
+```
+
+你之前看到的 `[B,256,256,144]` 到这里还只是 Hiera 的第一层 patch 网格：第二、三维是 256×256 空间，最后的 144 是 channel。Hiera 后续 stage 逐渐降低空间分辨率、增加 channel；FPN neck 再把通道统一到 256。`scalp=1` 丢掉最低分辨率那层，保留三层空间 feature。由于当前启用 `use_high_res_features_in_sam=true`，`forward_image()` 又提前用 mask decoder 的 `conv_s0/conv_s1` 将两层高分辨率 feature 降通道，得到：
+
+| 名称 | `forward_image()` 后 shape | 为什么保留 |
+|---|---:|---|
+| `feat_s0` | `[B,32,256,256]` | 最细空间网格，供 decoder 第二次上采样相加 |
+| `feat_s1` | `[B,64,128,128]` | 中间网格，供 decoder 第一次上采样相加 |
+| main feature | `[B,256,64,64]` | 进入 prompt/mask decoder 的主 image embedding |
+
+[`_prepare_backbone_features()`](../../../third_parts/sam2/modeling/sam2_base.py#L478) 为视频/帧接口把 BCHW 展平成 `HW×B×C`：
+
+```text
+[B,32,256,256]  → [65536,B,32]
+[B,64,128,128]  → [16384,B,64]
+[B,256,64,64]   → [4096,B,256]
+```
+
+`SAM2TrainRunner.inject_language_embd()` 随后把前两层 reshape 回 BCHW，构成 `high_res_features`；最后一层加 `no_mem_embed[1,1,256]` 后也 reshape 回 `[B,256,64,64]`。这里的 `no_mem_embed` 表示“当前静态图没有上一帧 memory”，不是语言融合，也不是把预测 mask 记入 memory。
+
+#### 9.2.2 sparse prompt `[B,2,256]` 到底从哪里来
+
+当前项目没有真实鼠标点击、box prompt 或上一张 mask。扩展 [`_forward_sam_heads()`](../../sa2va/models/extension/sam2_base.py#L112) 仍需调用 SAM2 原生 PromptEncoder，所以它在 `point_inputs is None` 时先创建：
+
+```text
+sam_point_coords = zeros[B,1,2]       # 一个占位坐标
+sam_point_labels = -ones[B,1]         # -1 表示“不是一个有效点”
+```
+
+然后调用 [`PromptEncoder.forward()`](../../../third_parts/sam2/modeling/sam/prompt_encoder.py#L140)：
+
+```python
+points=(sam_point_coords, sam_point_labels)
+boxes=None
+masks=None
+```
+
+因为 `boxes is None`，[`_embed_points(..., pad=True)`](../../../third_parts/sam2/modeling/sam/prompt_encoder.py#L79) 会**再追加一个** label=-1 的 padding point。于是 point 数从 1 变为 2。对 label=-1 的点，源码先把位置编码清零，再加同一个可学习 `not_a_point_embed.weight[1,256]`。所以结果是：
+
+```text
+初始 coords/labels       [B,1,2] / [B,1]
+PromptEncoder 再 pad     [B,2,2] / [B,2]
+位置编码 + not_a_point  [B,2,256]
+```
+
+这就是初始 `sparse_embeddings[B,2,256]` 的来源。“sparse”只表示它是少量 token，不铺满 64×64 空间。两个 token 也不是点击在左上角 `(0,0)`：label=-1 使坐标位置编码被清零，它们只表达“这里没有有效人工点”。
+
+为什么不直接从空的 `[B,0,256]` 开始？这是当前 SAM2 PromptEncoder 的接口行为：传入 point tuple 且没有 box 时会 padding。Sa2VA 扩展复用该接口，没有删除这些占位 token。
+
+#### 9.2.3 dense prompt `[B,256,64,64]` 从哪里来
+
+同一次 `PromptEncoder.forward()` 收到 `masks=None`。因此它不会编码 GT，也不会编码预测 mask，而是取一个可学习参数：
+
+```text
+no_mask_embed.weight       [1,256]
+reshape                    [1,256,1,1]
+expand                     [B,256,64,64]
+```
+
+这就是 `dense_embeddings[B,256,64,64]`。它在每个空间位置重复同一个 256 维“没有输入 mask”向量。名字里的 dense 是因为它和主图像 feature 一样覆盖 64×64 网格；它并不包含目标形状。
+
+到这里必须区分三样东西：
+
+| tensor | shape | 内容来源 | 是否携带目标语义 |
+|---|---:|---|---|
+| `backbone_features` | `[B,256,64,64]` | 当前图像 | 携带图像空间内容，但不知道用户要哪个对象 |
+| `dense_embeddings` | `[B,256,64,64]` | learned `no_mask_embed` 的广播 | 只表示没有 mask prompt |
+| `sparse_embeddings` | `[B,2,256]` | 两个 `not_a_point` token | 只表示没有有效点击 |
+
+此时还没有把 referring expression 告诉 SAM2。
+
+#### 9.2.4 语言 prompt `[B,1,256]` 在哪里加入
+
+MLLM 的 assistant `[SEG]` hidden 经 `text_hidden_fcs` 后为每个目标得到 256 维向量。`Sa2VAModel.forward()` 将单目标 batch 组织为：
+
+```text
+language_embeddings [B,1,256]
+```
+
+扩展 `_forward_sam_heads()` 做的是：
+
+```python
+sparse_embeddings = torch.cat(
+    [sparse_embeddings, language_embd], dim=1
+)
+```
+
+所以：
+
+```text
+两个 not-a-point token  [B,2,256]
+一个 language token     [B,1,256]
+拼接后的 sparse prompt  [B,3,256]
+```
+
+`dim=1` 是 token 数这一维，channel 仍为 256。它不是：
+
+- 把 `[B,1,256]` 广播后逐像素加到 `[B,256,64,64]`；
+- 把语言向量 reshape 成 16×16 图片；
+- 把 user 点击位置替换成图例位置；
+- 把 GT mask 送进 decoder。
+
+语言与图像真正发生信息交换，要等到下面的 mask decoder attention。
+
+#### 9.2.5 mask decoder 先组成 9 个 query tokens
+
+当前配置 `pred_obj_scores=true`、`num_multimask_outputs=3`。[`MaskDecoder.predict_masks()`](../../../third_parts/sam2/modeling/sam/mask_decoder.py#L168) 自带：
+
+```text
+1 个 object-score token
+1 个 IoU token
+4 个 mask tokens       # 1 个 single-mask + 3 个 multimask
+```
+
+合计 6 个 learned output tokens。再拼接上面 3 个 sparse prompt tokens，得到：
+
+```text
+tokens = [object, iou, mask0, mask1, mask2, mask3,
+          no-point0, no-point1, language]
+shape  = [B,9,256]
+```
+
+这 9 个 token 是 query。主图像特征先加 dense no-mask prompt：
+
+```text
+src = image_embeddings + dense_prompt_embeddings
+    = [B,256,64,64]
+```
+
+另有位置编码 `image_pe[1,256,64,64]`。进入 [`TwoWayTransformer.forward()`](../../../third_parts/sam2/modeling/sam/transformer.py#L72) 后，`src` 展平为 4096 个图像 token：
+
+```text
+query tokens  [B,9,256]
+image tokens  [B,4096,256]   # 4096 = 64×64
+image PE      [B,4096,256]
+```
+
+#### 9.2.6 “融合”具体发生在双向注意力里
+
+Two-Way Transformer 固定 depth=2。每个 [`TwoWayAttentionBlock`](../../../third_parts/sam2/modeling/sam/transformer.py#L119) 依次做：
+
+1. query self-attention：9 个 query 彼此交换信息；language token 能影响 mask/IoU token。
+2. token→image cross-attention：query 去读取 4096 个图像位置；referring expression 编码的条件开始查询哪些空间区域相关。
+3. query MLP：继续变换每个 query 表示。
+4. image→token cross-attention：4096 个图像 token 反过来读取 query；图像 feature 也被目标条件调制。
+5. 两个 block 结束后，再做一次 token→image final attention。
+
+因此“融合”不是一次 `cat` 就结束。`cat` 只是把 language token 放入 query 集合；真正把“要找哪条曲线”与“图上每个位置长什么样”结合起来的是多轮 cross-attention。输出为：
+
+```text
+hs   [B,9,256]       # 更新后的 query tokens
+src  [B,4096,256]    # 更新后的 image tokens
+```
+
+随后 decoder 取出 1 个 IoU token 和 4 个 mask tokens。两个 no-point 与 language token 不直接拿去点乘成 mask，但它们已经通过 attention 改变了 mask tokens 和 image tokens。
+
+#### 9.2.7 四个 mask token 怎样变成四张 256×256 logits
+
+更新后的 `src[B,4096,256]` 先恢复为 `[B,256,64,64]`。由于启用高分辨率 feature，decoder 分两次转置卷积上采样，并加入前面缓存的 FPN feature：
+
+```text
+[B,256,64,64]
+→ ConvTranspose 256→64, spatial 64→128
++ feat_s1 [B,64,128,128]
+→ [B,64,128,128]
+→ ConvTranspose 64→32, spatial 128→256
++ feat_s0 [B,32,256,256]
+→ upscaled_embedding [B,32,256,256]
+```
+
+四个 mask token `[B,4,256]` 分别通过自己的 3 层小 MLP，压到 32 维：
+
+```text
+hyper_in [B,4,32]
+```
+
+最后把每个 32 维向量与每个空间位置的 32 维 feature 做点积：
+
+```text
+[B,4,32] @ [B,32,256×256]
+→ mask logits [B,4,256,256]
+```
+
+这里输出的是 logits，可正可负，还没有 sigmoid。直观上，每个 mask token 生成一组 32 维“动态分类权重”，在 256×256 feature map 上逐位置判断前景。
+
+#### 9.2.8 为什么四张最后只留一张
+
+当前无点击初始帧满足 [`_use_multimask()`](../../../third_parts/sam2/modeling/sam2_base.py#L802) 的条件：配置允许 multimask，且有效点数按 0 计算。因此 `MaskDecoder.forward()` 舍弃 single-mask 的 `mask0`，保留 `mask1..3` 三个歧义候选和三个预测 IoU：
+
+```text
+候选 logits [B,3,256,256]
+候选质量     [B,3]
+```
+
+扩展 `_forward_sam_heads()` 使用 `argmax(ious)` 选出**模型自己估计质量最高**的一张，得到 `[B,1,256,256]`。它没有查看 GT 决定候选；若 IoU head 判断错，选中的 mask 也会错。方法同时把候选插值到 1024 用于 SAM2 的 high-res/video 接口，但 [`SAM2TrainRunner.inject_language_embd()`](../../sa2va/models/sam2_train.py#L74) 返回并供训练 loss 使用的是选中的 low-res 256×256 logits。
 
 ```mermaid
 flowchart TB
-  A[① 1024 图像] --> B[② forward_image/FPN]
-  B --> C[③ image features + no_mem_embed]
-  D[④ SEG projection 256] --> E[⑤ sparse prompt 拼接]
-  F[⑥ 空 point 与 no-mask dense prompt] --> E
-  C --> G[⑦ mask decoder]
+  A[① grounding image Bx3x1024x1024] --> B[② Hiera and FPN]
+  B --> C[③ image Bx256x64x64 plus high-res features]
+  D[④ two no-point tokens Bx2x256] --> E[⑤ sparse prompt Bx3x256]
+  F[⑥ language token Bx1x256] --> E
+  C --> G[⑦ Two-Way Transformer]
   E --> G
-  G --> H[⑧ low-res logits / IoU estimates]
-  H --> I[⑨ 单 mask 或最高 IoU 候选]
+  G --> H[⑧ four mask logits Bx4x256x256]
+  H --> I[⑨ predicted-IoU selects one mask]
 ```
 
 | 节点 | 图中节点对应源码 |
 |---|---|
-| ①–② | [`DirectResize.apply_image()`](../../sa2va/models/preprocess/image_resize.py)、[`SAM2TrainRunner.get_sam2_embeddings()`](../../sa2va/models/sam2_train.py#L108) |
-| ③ | [`SAM2TrainRunner.inject_language_embd()`](../../sa2va/models/sam2_train.py#L74) 的 `current_vision_feats` 与 `no_mem_embed` |
-| ④ | [`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L341) 的 `text_hidden_fcs` 输出 |
-| ⑤–⑦ | [`SAM2Base._forward_sam_heads()`](../../sa2va/models/extension/sam2_base.py#L112) 的 prompt encoder、`torch.cat` 和 mask decoder |
-| ⑧–⑨ | 同一方法返回 `low_res_multimasks/ious/low_res_masks`；multimask 时以最高估计 IoU 选一个 |
+| ① | [`DirectResize.apply_image()`](../../sa2va/models/preprocess/image_resize.py)、[`preprocess_image()`](../../sa2va/models/sam2_train.py#L66) |
+| ②–③ | [`get_sam2_embeddings()`](../../sa2va/models/sam2_train.py#L108)、[`ImageEncoder.forward()`](../../../third_parts/sam2/modeling/backbones/image_encoder.py#L29) |
+| ④ | [`SAM2Base._forward_sam_heads()`](../../sa2va/models/extension/sam2_base.py#L167)、[`PromptEncoder._embed_points()`](../../../third_parts/sam2/modeling/sam/prompt_encoder.py#L79) |
+| ⑤–⑥ | [`PromptEncoder.forward()`](../../../third_parts/sam2/modeling/sam/prompt_encoder.py#L140)、扩展的 `torch.cat(...,dim=1)` |
+| ⑦ | [`MaskDecoder.predict_masks()`](../../../third_parts/sam2/modeling/sam/mask_decoder.py#L168) → [`TwoWayTransformer.forward()`](../../../third_parts/sam2/modeling/sam/transformer.py#L72) |
+| ⑧ | [`MaskDecoder.predict_masks()`](../../../third_parts/sam2/modeling/sam/mask_decoder.py#L221) 的 upscaling、hypernetwork 和矩阵乘法 |
+| ⑨ | [`MaskDecoder.forward()`](../../../third_parts/sam2/modeling/sam/mask_decoder.py#L110) 与扩展 [`_forward_sam_heads()`](../../sa2va/models/extension/sam2_base.py#L247) |
 
-| SAM2 内部张量/值 | 训练单目标 shape 或契约 | 固定性 |
-|---|---|---|
-| 视觉金字塔 | `current_vision_feats` 为多尺度 list，末级按 `feat_sizes[-1]` 还原为 `[B,256,H_f,W_f]` | 256 为模型 hidden 配置；`H_f/W_f` 由 backbone/输入决定，当前文档未记录实测值 |
-| no-memory image feature | `[B,256,H_f,W_f]` | 训练 `directly_add_no_mem_embed` 分支；不是跨帧 memory attention |
-| 投影语言向量 | `[B,1,256]`（strict 单目标） | 1 来自对齐契约；256 为 prompt 维度 |
-| 空 point / labels | `[B,1,2]` / `[B,1]`，label=-1 | [`_forward_sam_heads()`](../../sa2va/models/extension/sam2_base.py#L112) 源码固定 |
-| sparse / dense prompt | sparse `[B,N_s,256]` 再拼语言为 `[B,N_s+1,256]`；dense `[B,256,H_f,W_f]` | `N_s` 及空间值应运行时观察；dense 来自 no-mask embedding |
-| 低分辨率候选 logits | `[B,M,4H_f,4W_f]`，`M=1` 或 3 | 扩展方法 docstring 与 `multimask_output` 控制；实际 `H_f/W_f` 未记录 |
-| 用于 loss 的选中 logits | `low_res_masks [B,1,4H_f,4W_f]`；多候选时按 `ious.argmax` 选 | 源码固定的选择规则；不是用 GT 选最佳候选 |
+#### 9.2.9 一张表串起 SAM2 的全部主要 shape
 
-HF 固定 checkpoint remote code 的相应分支在仓库镜像 [`SAM2.language_embd_inference()`](../../sa2va/hf/models/sam2.py#L332) → [`SAM2VideoPredictor.add_language_embd()`](../../sa2va/hf/models/sam2.py#L3752) → HF 镜像 [`_forward_sam_heads()`](../../sa2va/hf/models/sam2.py#L3190)：同样把 language token 拼到 sparse prompt，但先 `init_state(images)`，`add_language_embd(...,inference=True)` 后又调用 `propagate_in_video()`，返回的是传播阶段 mask。训练直接消费 low-res logits 算损失；HF 推理再由 [`predict_forward()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 缩放/阈值化。`SAM2VideoPredictor` 的状态维护与传播不能从训练 runner 的直接 mask-head 路径推断。基础 SAM2 prompt/mask decoder 的具体内部注意力层属第三方实现；当前仓库训练配置通过 [`SAM2TrainRunner.__init__()`](../../sa2va/models/sam2_train.py#L17) 加载 `third_parts.sam2`，这里仅陈述本 fork 实际传入的张量接口，不替第三方内部编造额外步骤。
+以下 shape 是当前 `sam2_hiera_l.yaml`、1024 输入、strict 单目标路径的静态推导；`B` 随 batch 变化。它们不是 Phase 7C 保存的运行时中间 tensor 值。
+
+| 顺序 | tensor | shape | 从哪里得到 | 下一步去哪里 |
+|---:|---|---:|---|---|
+| 1 | normalized image | `[B,3,1024,1024]` | resize + mean/std | Hiera PatchEmbed |
+| 2 | first patch grid | `[B,256,256,144]` | stride-4 Conv + BHWC | Hiera stages |
+| 3 | high-res `feat_s0` | `[B,32,256,256]` | FPN + decoder `conv_s0` | 第二次 upscaling 相加 |
+| 4 | high-res `feat_s1` | `[B,64,128,128]` | FPN + decoder `conv_s1` | 第一次 upscaling 相加 |
+| 5 | main image embedding | `[B,256,64,64]` | FPN main level + no-memory embedding | mask decoder `image_embeddings` |
+| 6 | empty point coords/labels | `[B,1,2]` / `[B,1]` | 扩展创建，label=-1 | PromptEncoder |
+| 7 | initial sparse prompt | `[B,2,256]` | point encoder 又 pad 一个无效点 | 与 language 拼接 |
+| 8 | dense no-mask prompt | `[B,256,64,64]` | `no_mask_embed` 广播 | 加到 image embedding |
+| 9 | projected language | `[B,1,256]` | assistant SEG + `text_hidden_fcs` | sparse prompt |
+| 10 | final sparse prompt | `[B,3,256]` | 2 no-point + 1 language | 与 learned output tokens 拼接 |
+| 11 | all decoder queries | `[B,9,256]` | 6 output + 3 sparse | Two-Way Transformer |
+| 12 | flattened image tokens | `[B,4096,256]` | 64×64 image+dense prompt | Two-Way Transformer |
+| 13 | mask-token features | `[B,4,256]` | transformer 输出 `hs` | 4 个 hypernetwork MLP |
+| 14 | upscaled image feature | `[B,32,256,256]` | 两次反卷积 + high-res features | 与 hyper weights 点积 |
+| 15 | all raw logits | `[B,4,256,256]` | `[B,4,32] @ [B,32,65536]` | single/multimask 选择 |
+| 16 | multimask candidates | `[B,3,256,256]` | 当前 initial/no-point 路径保留 1..3 | predicted IoU argmax |
+| 17 | selected logits | `[B,1,256,256]` | 每样本选一个候选 | train loss / inference resize |
+
+#### 9.2.10 训练与 HF 推理在 SAM2 部分的差异
+
+训练类是仓库的 `SAM2TrainRunner + extension.SAM2Base`：它对单图直接取 image features，显式加 `no_mem_embed`，直接调用 mask head，返回 low-res logits 算 loss。GT 从来不作为 prompt 传入。
+
+HF 推理入口不同。仓库镜像中的 [`SAM2.get_sam2_embeddings()`](../../sa2va/hf/models/sam2.py#L360) 调 `init_state(images)`；[`language_embd_inference()`](../../sa2va/hf/models/sam2.py#L332) 调 `add_language_embd(...,inference=True)` 再 `propagate_in_video()`。即使只有一张图，也复用了 video predictor 的 state 接口。相应 [`_forward_sam_heads()`](../../sa2va/hf/models/sam2.py#L3190) 仍把 256 维 language token 拼到 sparse prompt，所以核心语言—图像融合方式一致；状态管理和输出传播路径不同。
+
+最后 HF [`predict_forward()`](../../sa2va/hf/models/modeling_sa2va_chat.py) 将 mask logits bilinear resize 回原图 `(H,W)`，做 `sigmoid()>0.5`，返回 NumPy bool mask。项目 [`process_prediction_masks()`](../chartground_edit/inference/mask_processing.py) 只验证/规范化输出，不用 GT 修正。
+
+训练方向相反：[`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py#L406) 用 nearest 把原图 GT `[1,H,W]` resize 到预测 logits 的 256×256，再算 loss。使用 nearest 是为了保持二值类别，不用 bilinear 制造 0 到 1 的软边界。
 
 ### 9.3 Loss 与冻结梯度
 
 配置 [`phase4b_smoke1.py`](../configs/phase4b_smoke1.py) 继承到 A/B：sigmoid mask CE `loss_weight=2.0`，Dice `loss_weight=0.5`，`loss_sample_points=True`。[`Sa2VAModel.sample_points()`](../../sa2va/models/sa2va.py) 用 `num_points=12544`、`oversample_ratio=3.0`、`importance_sample_ratio=0.75` 取得 uncertain points；它们是模型构造默认值，不是图像所有像素数。语言 CE 在 [`InternVLMLLM._compute_loss()`](../../sa2va/models/mllm/internvl.py)，分割 CE/Dice 在 [`Sa2VAModel.forward()`](../../sa2va/models/sa2va.py) 组装成 `llm_loss/loss_mask/loss_dice`，MMEngine `parse_losses()` 汇总。单图 strict 路不允许 `check_obj_number(fix_number=5)`。
+
+以单目标 batch size 1 为例，decoder 返回的 logits 是 `[1,1,256,256]`，而 GT 还是原图 `[1,H,W]`。代码的对齐顺序是：
+
+```text
+GT [1,H,W]
+→ unsqueeze 成 [1,1,H,W]
+→ nearest resize 到 [1,1,256,256]
+→ squeeze/cat 后与 pred_masks 对齐
+```
+
+`nearest` 只复制 0/1 类别，不会在边界制造 0.37 这类插值值。注意这里改变的是用于 loss 的 GT 副本，原始 mask 文件没有被改写。
+
+开启 point sampling 后，不在全部 65,536 个像素上算 mask loss，而是从 logits 中采 12,544 个点。`get_uncertain_point_coords_with_randomness` 先过采样候选，再优先选择模型接近决策边界、较不确定的位置，并混入随机点；随后同一组坐标分别采 prediction 和 GT。坐标选择包在 `torch.no_grad()` 中，但 `mask_point_preds` 的采样在外部执行，所以 loss 对 logits 仍可求梯度。
+
+三项 loss 的职责不同：
+
+| loss | 输入 | 主要约束 | 当前权重 |
+|---|---|---|---:|
+| `llm_loss` | 语言 logits 与 shift 后 assistant labels | 生成 `Sure, [SEG].` 等目标 token | MLLM 原始 CE，外层汇总 |
+| `loss_mask` | 采样的 mask logits 与 0/1 GT | 每个采样点的前景/背景分类 | 2.0 |
+| `loss_dice` | 同一组预测与 GT | 整体前景重叠，缓解前背景不平衡 | 0.5 |
+
+配置中的 sigmoid CE 会在 loss 内处理 logits；不要在训练前先手工阈值化。阈值 `sigmoid()>0.5` 只属于推理生成 bool mask。若先阈值化，离散比较几乎处处不可导，projection 得不到有用梯度。
 
 ```text
 total loss → mask logits → SAM2 mask-head 运算 → projected SEG
@@ -282,6 +789,18 @@ total loss → mask logits → SAM2 mask-head 运算 → projected SEG
 ```
 
 `grounding_encoder.requires_grad_(False)` 只禁止存储其参数梯度；前向运算仍在计算图里，Jacobian 可把 loss 对其输入语言向量的导数传回 projection。不要在 SAM2 整段外包 `torch.no_grad()`，那会切断梯度。断点看 `language_embeddings.shape`、`pred_masks.shape`、`gt_masks.shape` 与 projection grad；测试见 [`test_phase4b_alignment.py`](../tests/test_phase4b_alignment.py)、[`test_phase7b_v2_lora.py`](../tests/test_phase7b_v2_lora.py)。
+
+可以把“冻结但可回传”理解成一条固定函数：
+
+```text
+projection 参数 θ
+→ language prompt p(θ)
+→ 冻结的 SAM2 函数 f(p, image)
+→ mask logits
+→ loss
+```
+
+SAM2 参数不更新，但函数 `f` 对输入 `p` 的导数仍存在，因此链式法则能计算 `∂loss/∂θ`。只有把 SAM2 包进 `torch.no_grad()` 或对 language prompt 调 `detach()`，这条路才会断。Strategy B 还允许梯度继续穿过 `text_hidden_fcs` 回到 LLM LoRA；冻结的 LLM 主权重仍不会进入 optimizer。
 
 ## 10. 完整无 GT 推理数据流
 
@@ -573,7 +1092,7 @@ Paired group bootstrap 先按 sample ID 配对 B/A，逐组取平均差，再以
 | metrics | [`metrics.py`](../chartground_edit/inference/metrics.py) | [`run_phase7c_v2_frozen_test.py`](../scripts/run_phase7c_v2_frozen_test.py) | [`test_phase7c_v2_frozen_test.py`](../tests/test_phase7c_v2_frozen_test.py) |
 | gallery | [`render_phase8b_saved_visualizations.py`](../scripts/render_phase8b_saved_visualizations.py) | [`README.md`](../README.md) | [`test_phase8b_saved_visualizations.py`](../tests/test_phase8b_saved_visualizations.py) |
 
-下面 30 个高频入口的行号已用 `rg` 对照本次修订前的源码 commit `9aa2930`；跳转时**同时认文件与 symbol**，后续源码改动可能使行号偏移。HF 项是仓库镜像定位；真实推理仍执行固定 checkpoint 的 remote code。
+下面 30 个高频入口的行号已用 `rg` 对照本次修订前的源码 commit `dace042`；跳转时**同时认文件与 symbol**，后续源码改动可能使行号偏移。HF 项是仓库镜像定位；真实推理仍执行固定 checkpoint 的 remote code。
 
 | 环节 | 当前源码定位（symbol + 行号） | 环节 | 当前源码定位（symbol + 行号） |
 |---|---|---|---|

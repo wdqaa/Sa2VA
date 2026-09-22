@@ -20,7 +20,7 @@ def _guide() -> str:
     return GUIDE.read_text(encoding="utf-8")
 
 
-def test_guide_has_all_chapters_six_mapped_diagrams_and_readme_entry() -> None:
+def test_guide_has_all_chapters_eight_mapped_diagrams_and_readme_entry() -> None:
     guide = _guide()
     for index in range(22):
         assert re.search(rf"^## {index}\. ", guide, flags=re.MULTILINE)
@@ -31,7 +31,7 @@ def test_guide_has_all_chapters_six_mapped_diagrams_and_readme_entry() -> None:
         "## 附录 B：术语表",
     ):
         assert heading in guide
-    assert guide.count("```mermaid\n") == 6
+    assert guide.count("```mermaid\n") == 8
     for suffix in guide.split("```mermaid\n")[1:]:
         assert re.search(r"\n```\n\n\| 节点", suffix)
         diagram = suffix.split("\n```", 1)[0]
@@ -41,6 +41,23 @@ def test_guide_has_all_chapters_six_mapped_diagrams_and_readme_entry() -> None:
         for line in lines[1:]:
             assert "-->" in line and line.count("[") == line.count("]")
     assert "docs/PROJECT_STUDY_GUIDE_ZH.md" in (PROJECT / "README.md").read_text(encoding="utf-8")
+
+
+def test_guide_explains_beginner_tensor_and_sam2_data_flow() -> None:
+    guide = _guide()
+    for required in (
+        "### 0.2 张量形状怎么读",
+        "### 0.3 同一张图涉及四套坐标，不要混用",
+        "### 7.1 先区分 ID、embedding、hidden state 和 logit",
+        "#### 9.2.2 sparse prompt `[B,2,256]` 到底从哪里来",
+        "#### 9.2.3 dense prompt `[B,256,64,64]` 从哪里来",
+        "#### 9.2.6 “融合”具体发生在双向注意力里",
+        "#### 9.2.9 一张表串起 SAM2 的全部主要 shape",
+        "[B,9,256]",
+        "[B,4096,256]",
+        "[B,4,256,256]",
+    ):
+        assert required in guide
 
 
 def test_every_guide_relative_link_resolves_and_no_private_path() -> None:
