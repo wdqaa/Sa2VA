@@ -144,8 +144,8 @@ projects/sa2va/.venv/bin/python \
 [data_card_synthetic_v1.md](docs/data_card_synthetic_v1.md) 和
 [synthetic_v1_audit.md](docs/synthetic_v1_audit.md)。
 
-视觉分布更丰富的 `synthetic_v2` 共 1,600 条，train/val/test=`960/320/320`，
-每个 chart/referring 组合 100 条且 action 精确平衡；它使用独立 v2 schema，不修改
+视觉分布更丰富的 `synthetic_v2` 共 3,600 条，train/val/test=`960/320/320`，
+每个 chart/referring 组合 300 条且 action 精确平衡；它使用独立 v2 schema，不修改
 v1。生成与联合重复审计：
 
 ```bash
@@ -167,11 +167,10 @@ projects/sa2va/.venv/bin/python \
 ### synthetic_v2 projection-only baseline
 
 Phase 7A 使用原始 Sa2VA projection 初始化，只训练 2.75M 个 `text_hidden_fcs`
-参数，在 synthetic_v2 的 960 条 train 上完成 5 epoch，并且只在 320 条 val 上
+参数，在 synthetic_v2 的 train 上完成 5 epoch，并且只在 320 条 val 上
 选择 checkpoint。step4800 的 16-group Macro IoU 为 `0.210365`，zero-shot 为
 `0.097575`，v1 step960 迁移为 `0.178815`；详细训练曲线、分组指标和限制见
-[Phase 7A results](docs/phase7a_v2_projection_results.md)。Phase 7A 本身未访问
-synthetic_v2 test。
+[Phase 7A results](docs/phase7a_v2_projection_results.md)。
 
 ### synthetic_v2 frozen A/B test
 
