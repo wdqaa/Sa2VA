@@ -17,6 +17,20 @@ The core unified model: SAM-2 + MLLM for referring segmentation, grounded conver
 
 📂 [`projects/sa2va`](./projects/sa2va/README.md) · [📕 TPAMI](https://ieeexplore.ieee.org/document/11640960) · [📜 arXiv](https://arxiv.org/abs/2501.04001) · [🏠 Page](https://lxtgh.github.io/project/sa2va) · [🤗 Models](https://huggingface.co/collections/ByteDance/sa2va-model-zoo-677e3084d71b5f108d00e093)
 
+### 📈 [ChartGround-Edit](./projects/chartground_edit/README.md) — Scientific chart grounding and editing
+
+An extension built on Sa2VA-InternVL3-2B for natural-language grounding of
+curves, bars, scatter series, and confidence bands, followed by controllable
+mask-based editing. Its final projection + small-LLM-LoRA adapter improves the
+synthetic_v2 frozen-test Macro IoU from **0.0816 to 0.2940** while training
+about 0.1726% of model parameters.
+
+[![ChartGround-Edit Strategy B gallery](./projects/chartground_edit/assets/phase7c_v2_final_gallery.png)](./projects/chartground_edit/README.md)
+
+📂 [`projects/chartground_edit`](./projects/chartground_edit/README.md) ·
+[Model card](./projects/chartground_edit/MODEL_CARD.md) ·
+[Frozen-test results](./projects/chartground_edit/docs/phase7c_v2_frozen_test_results.md)
+
 ### 🔍 [VRT](./projects/vrt_sa2va/README.md) — Visual Reasoning Tracer
 *Haobo Yuan, Yueyi Sun, Yanwei Li, Tao Zhang, Xueqing Deng, Henghui Ding, Lu Qi, Anran Wang, Xiangtai Li, Ming-Hsuan Yang*
 

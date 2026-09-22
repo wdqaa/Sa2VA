@@ -1,0 +1,2420 @@
+{
+  "adapter_reload_metadata_step": 960,
+  "best_checkpoint": "step4800",
+  "best_vs_strategy_a": {
+    "empty_rate_delta": -0.028125,
+    "group_iou_deltas": {
+      "bar/appearance": 0.046590279663936696,
+      "bar/category": 0.10127135054594857,
+      "bar/legend": 0.04835234058306981,
+      "bar/trend": 0.010840475272259176,
+      "confidence_band/appearance": 0.012033710949389043,
+      "confidence_band/category": 0.18673591972995107,
+      "confidence_band/legend": 0.11875911681291845,
+      "confidence_band/trend": 0.259007686904844,
+      "line/appearance": 0.001955764157993589,
+      "line/category": -0.007642914075807111,
+      "line/legend": 0.0111835144277376,
+      "line/trend": 0.01274742002822557,
+      "scatter/appearance": 0.07973672865038625,
+      "scatter/category": 0.0071620049577562905,
+      "scatter/legend": 0.07323231878054706,
+      "scatter/trend": 0.04657144265447086
+    },
+    "macro_dice_delta": 0.07207345700493822,
+    "macro_iou_delta": 0.0630335725027267,
+    "select_strategy_b": true,
+    "selection_checks": {
+      "empty_rate_within_0_02": true,
+      "groups_declining_over_0_03_at_most_2": true,
+      "macro_iou_gain_at_least_0_02": true
+    }
+  },
+  "checkpoint_order": [
+    "step960",
+    "step1920",
+    "step2880",
+    "step3840",
+    "step4800"
+  ],
+  "checkpoints": {
+    "step1920": {
+      "empty_count": 6,
+      "empty_rate": 0.01875,
+      "group_macro_dice": 0.3217759891315299,
+      "group_macro_iou": 0.2297964948518065,
+      "groups": {
+        "action": {
+          "extract": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.3120563788191274,
+            "mean_iou": 0.2238078368626349
+          },
+          "highlight": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.3414564047177288,
+            "mean_iou": 0.24260700402130286
+          },
+          "recolor": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.3025821437468291,
+            "mean_iou": 0.2199519287345284
+          },
+          "remove": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.33100902924243425,
+            "mean_iou": 0.2328192097887599
+          }
+        },
+        "chart_referring": {
+          "bar/appearance": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.3888479384331473,
+            "mean_iou": 0.29876513638853924
+          },
+          "bar/category": {
+            "count": 20,
+            "empty_rate": 0.1,
+            "mean_dice": 0.2644098712170518,
+            "mean_iou": 0.19516674533932232
+          },
+          "bar/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3379514809316348,
+            "mean_iou": 0.24609414355400464
+          },
+          "bar/trend": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.3244947140958336,
+            "mean_iou": 0.23002997820896823
+          },
+          "confidence_band/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.4378032180451683,
+            "mean_iou": 0.3377762648638994
+          },
+          "confidence_band/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.45121156790648725,
+            "mean_iou": 0.3727814336749668
+          },
+          "confidence_band/legend": {
+            "count": 20,
+            "empty_rate": 0.1,
+            "mean_dice": 0.356071273112829,
+            "mean_iou": 0.27774099447044914
+          },
+          "confidence_band/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.4516749725269544,
+            "mean_iou": 0.3403144704771466
+          },
+          "line/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2322773723929988,
+            "mean_iou": 0.15295078996600625
+          },
+          "line/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.24792401641793194,
+            "mean_iou": 0.1643423810389569
+          },
+          "line/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.28656730839475714,
+            "mean_iou": 0.1808445522964
+          },
+          "line/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.20392250344761442,
+            "mean_iou": 0.12684057199860574
+          },
+          "scatter/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.29665469106962283,
+            "mean_iou": 0.19720126514986183
+          },
+          "scatter/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.25902240936833865,
+            "mean_iou": 0.16132383407211637
+          },
+          "scatter/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.27463702356421094,
+            "mean_iou": 0.1782395635520598
+          },
+          "scatter/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3349454651798974,
+            "mean_iou": 0.21633179257760093
+          }
+        },
+        "chart_type": {
+          "bar": {
+            "count": 80,
+            "empty_rate": 0.05,
+            "mean_dice": 0.3289260011694169,
+            "mean_iou": 0.24251400087270855
+          },
+          "confidence_band": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.4241902578978597,
+            "mean_iou": 0.3321532908716155
+          },
+          "line": {
+            "count": 80,
+            "empty_rate": 0.0,
+            "mean_dice": 0.24267280016332554,
+            "mean_iou": 0.1562445738249922
+          },
+          "scatter": {
+            "count": 80,
+            "empty_rate": 0.0,
+            "mean_dice": 0.29131489729551746,
+            "mean_iou": 0.18827411383790973
+          }
+        },
+        "degradation_type": {
+          "blur": {
+            "count": 16,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2761004321042887,
+            "mean_iou": 0.19711291373446466
+          },
+          "blur+screenshot_scale": {
+            "count": 21,
+            "empty_rate": 0.047619047619047616,
+            "mean_dice": 0.3535845068519789,
+            "mean_iou": 0.25201135172081224
+          },
+          "clean": {
+            "count": 26,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2496888333811519,
+            "mean_iou": 0.167175170301666
+          },
+          "jpeg": {
+            "count": 8,
+            "empty_rate": 0.125,
+            "mean_dice": 0.27128801734865493,
+            "mean_iou": 0.18373435362836055
+          },
+          "jpeg+antialias_x2": {
+            "count": 38,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3248127185303818,
+            "mean_iou": 0.21749881289659884
+          },
+          "jpeg+blur": {
+            "count": 28,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3321629008103968,
+            "mean_iou": 0.24964171911197633
+          },
+          "jpeg+blur+antialias_x2": {
+            "count": 44,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3529963652136029,
+            "mean_iou": 0.2567762773314872
+          },
+          "jpeg+blur+screenshot_scale": {
+            "count": 16,
+            "empty_rate": 0.0,
+            "mean_dice": 0.4018724051897894,
+            "mean_iou": 0.29112453768511204
+          },
+          "jpeg+blur+screenshot_scale+antialias_x2": {
+            "count": 35,
+            "empty_rate": 0.0,
+            "mean_dice": 0.33615796716042745,
+            "mean_iou": 0.24672485124793667
+          },
+          "jpeg+screenshot_scale": {
+            "count": 28,
+            "empty_rate": 0.07142857142857142,
+            "mean_dice": 0.2552841890766845,
+            "mean_iou": 0.1829404026847373
+          },
+          "jpeg+screenshot_scale+antialias_x2": {
+            "count": 41,
+            "empty_rate": 0.04878048780487805,
+            "mean_dice": 0.30337460219618684,
+            "mean_iou": 0.21537973715368042
+          },
+          "screenshot_scale": {
+            "count": 19,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3950596444075599,
+            "mean_iou": 0.28805589299551254
+          }
+        },
+        "difficulty": {
+          "easy": {
+            "count": 112,
+            "empty_rate": 0.008928571428571428,
+            "mean_dice": 0.4018742777856418,
+            "mean_iou": 0.30606586447884027
+          },
+          "hard": {
+            "count": 96,
+            "empty_rate": 0.0,
+            "mean_dice": 0.24159320385721794,
+            "mean_iou": 0.1565795145551197
+          },
+          "medium": {
+            "count": 112,
+            "empty_rate": 0.044642857142857144,
+            "mean_dice": 0.3104058021411141,
+            "mean_iou": 0.21628453690764715
+          }
+        },
+        "referring_type": {
+          "appearance": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.3388958049852343,
+            "mean_iou": 0.24667336409207669
+          },
+          "category": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.30564196622745243,
+            "mean_iou": 0.2234035985313406
+          },
+          "legend": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.313806771500858,
+            "mean_iou": 0.22072981346822837
+          },
+          "trend": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.32875941381257495,
+            "mean_iou": 0.22837920331558034
+          }
+        },
+        "theme": {
+          "dark": {
+            "count": 160,
+            "empty_rate": 0.0375,
+            "mean_dice": 0.3379986022181554,
+            "mean_iou": 0.24836815674566823
+          },
+          "light": {
+            "count": 160,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3055533760449044,
+            "mean_iou": 0.21122483295794478
+          }
+        }
+      },
+      "mean_latency_ms": 650.7384721888229,
+      "median_latency_ms": 621.2948132306337,
+      "micro_dice": 0.46568570587606356,
+      "micro_iou": 0.3035138939000507,
+      "nonempty_count": 314,
+      "nonempty_disjoint_rate": 0.090625,
+      "overlap_count": 285,
+      "overlap_rate": 0.890625,
+      "sample_count": 320,
+      "sample_macro_dice": 0.3217759891315299,
+      "sample_macro_iou": 0.22979649485180648
+    },
+    "step2880": {
+      "empty_count": 10,
+      "empty_rate": 0.03125,
+      "group_macro_dice": 0.3216687925253567,
+      "group_macro_iou": 0.23804261171559846,
+      "groups": {
+        "action": {
+          "extract": {
+            "count": 80,
+            "empty_rate": 0.05,
+            "mean_dice": 0.2813694126158595,
+            "mean_iou": 0.20283748316458058
+          },
+          "highlight": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.3524718829112304,
+            "mean_iou": 0.26764505776858816
+          },
+          "recolor": {
+            "count": 80,
+            "empty_rate": 0.0375,
+            "mean_dice": 0.3091812424955009,
+            "mean_iou": 0.2305761124426374
+          },
+          "remove": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.34365263207883606,
+            "mean_iou": 0.2511117934865876
+          }
+        },
+        "chart_referring": {
+          "bar/appearance": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.35110566666149584,
+            "mean_iou": 0.2645399349419501
+          },
+          "bar/category": {
+            "count": 20,
+            "empty_rate": 0.15,
+            "mean_dice": 0.26065774880982484,
+            "mean_iou": 0.20411327575391738
+          },
+          "bar/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3605657831664665,
+            "mean_iou": 0.263142342019504
+          },
+          "bar/trend": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.23025470072122228,
+            "mean_iou": 0.16204582577697885
+          },
+          "confidence_band/appearance": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.4361894422421778,
+            "mean_iou": 0.33706226996814087
+          },
+          "confidence_band/category": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.6139857332734395,
+            "mean_iou": 0.5348004523468745
+          },
+          "confidence_band/legend": {
+            "count": 20,
+            "empty_rate": 0.15,
+            "mean_dice": 0.3917720517641082,
+            "mean_iou": 0.3360725275207319
+          },
+          "confidence_band/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.5786560892990521,
+            "mean_iou": 0.4571977696089016
+          },
+          "line/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2221938573842756,
+            "mean_iou": 0.14798886819432505
+          },
+          "line/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.23639687136548884,
+            "mean_iou": 0.15780348214287943
+          },
+          "line/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2697286815350206,
+            "mean_iou": 0.17550722800934832
+          },
+          "line/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.19004287671105197,
+            "mean_iou": 0.12602215703876915
+          },
+          "scatter/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2894274676726081,
+            "mean_iou": 0.1956873398701558
+          },
+          "scatter/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.21880663818429244,
+            "mean_iou": 0.13385312767952637
+          },
+          "scatter/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2635829044955664,
+            "mean_iou": 0.17033238088031838
+          },
+          "scatter/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.23333416711961624,
+            "mean_iou": 0.14251280569725341
+          }
+        },
+        "chart_type": {
+          "bar": {
+            "count": 80,
+            "empty_rate": 0.0625,
+            "mean_dice": 0.30064597483975236,
+            "mean_iou": 0.22346034462308761
+          },
+          "confidence_band": {
+            "count": 80,
+            "empty_rate": 0.0625,
+            "mean_dice": 0.5051508291446944,
+            "mean_iou": 0.4162832548611622
+          },
+          "line": {
+            "count": 80,
+            "empty_rate": 0.0,
+            "mean_dice": 0.22959057174895925,
+            "mean_iou": 0.15183043384633046
+          },
+          "scatter": {
+            "count": 80,
+            "empty_rate": 0.0,
+            "mean_dice": 0.25128779436802084,
+            "mean_iou": 0.1605964135318135
+          }
+        },
+        "degradation_type": {
+          "blur": {
+            "count": 16,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2596545842535798,
+            "mean_iou": 0.18623666621306467
+          },
+          "blur+screenshot_scale": {
+            "count": 21,
+            "empty_rate": 0.09523809523809523,
+            "mean_dice": 0.35733262254436304,
+            "mean_iou": 0.25716543539183234
+          },
+          "clean": {
+            "count": 26,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3734236261881027,
+            "mean_iou": 0.27670452098884174
+          },
+          "jpeg": {
+            "count": 8,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2211099132427773,
+            "mean_iou": 0.14512167681677593
+          },
+          "jpeg+antialias_x2": {
+            "count": 38,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2673846032584617,
+            "mean_iou": 0.1805384115093168
+          },
+          "jpeg+blur": {
+            "count": 28,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3234946015830622,
+            "mean_iou": 0.25458417245986176
+          },
+          "jpeg+blur+antialias_x2": {
+            "count": 44,
+            "empty_rate": 0.045454545454545456,
+            "mean_dice": 0.31300050869755214,
+            "mean_iou": 0.2295291887265363
+          },
+          "jpeg+blur+screenshot_scale": {
+            "count": 16,
+            "empty_rate": 0.0,
+            "mean_dice": 0.38066069196055896,
+            "mean_iou": 0.28581109335326754
+          },
+          "jpeg+blur+screenshot_scale+antialias_x2": {
+            "count": 35,
+            "empty_rate": 0.08571428571428572,
+            "mean_dice": 0.31294764016040777,
+            "mean_iou": 0.23605258642567842
+          },
+          "jpeg+screenshot_scale": {
+            "count": 28,
+            "empty_rate": 0.03571428571428571,
+            "mean_dice": 0.3464931076012346,
+            "mean_iou": 0.2674338726953618
+          },
+          "jpeg+screenshot_scale+antialias_x2": {
+            "count": 41,
+            "empty_rate": 0.024390243902439025,
+            "mean_dice": 0.2987907466350665,
+            "mean_iou": 0.2212695746865407
+          },
+          "screenshot_scale": {
+            "count": 19,
+            "empty_rate": 0.05263157894736842,
+            "mean_dice": 0.4111162814261724,
+            "mean_iou": 0.3134191684075165
+          }
+        },
+        "difficulty": {
+          "easy": {
+            "count": 112,
+            "empty_rate": 0.008928571428571428,
+            "mean_dice": 0.4442577691103559,
+            "mean_iou": 0.34864522871034836
+          },
+          "hard": {
+            "count": 96,
+            "empty_rate": 0.052083333333333336,
+            "mean_dice": 0.1909244550072302,
+            "mean_iou": 0.1240635972808034
+          },
+          "medium": {
+            "count": 112,
+            "empty_rate": 0.03571428571428571,
+            "mean_dice": 0.3111463909558945,
+            "mean_iou": 0.22513629280781564
+          }
+        },
+        "referring_type": {
+          "appearance": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.3247291084901393,
+            "mean_iou": 0.23631960324364298
+          },
+          "category": {
+            "count": 80,
+            "empty_rate": 0.05,
+            "mean_dice": 0.3324617479082614,
+            "mean_iou": 0.2576425844807994
+          },
+          "legend": {
+            "count": 80,
+            "empty_rate": 0.0375,
+            "mean_dice": 0.3214123552402904,
+            "mean_iou": 0.23626361960747566
+          },
+          "trend": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.3080719584627357,
+            "mean_iou": 0.22194463953047575
+          }
+        },
+        "theme": {
+          "dark": {
+            "count": 160,
+            "empty_rate": 0.025,
+            "mean_dice": 0.3483427707573109,
+            "mean_iou": 0.26518370627594423
+          },
+          "light": {
+            "count": 160,
+            "empty_rate": 0.0375,
+            "mean_dice": 0.29499481429340246,
+            "mean_iou": 0.21090151715525263
+          }
+        }
+      },
+      "mean_latency_ms": 647.4603272043169,
+      "median_latency_ms": 620.7296028733253,
+      "micro_dice": 0.5336003135487268,
+      "micro_iou": 0.363884634236423,
+      "nonempty_count": 310,
+      "nonempty_disjoint_rate": 0.103125,
+      "overlap_count": 277,
+      "overlap_rate": 0.865625,
+      "sample_count": 320,
+      "sample_macro_dice": 0.32166879252535674,
+      "sample_macro_iou": 0.23804261171559843
+    },
+    "step3840": {
+      "empty_count": 4,
+      "empty_rate": 0.0125,
+      "group_macro_dice": 0.3625956755792703,
+      "group_macro_iou": 0.2724915427146942,
+      "groups": {
+        "action": {
+          "extract": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.33350895788868584,
+            "mean_iou": 0.2483666828494036
+          },
+          "highlight": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.3999343440727495,
+            "mean_iou": 0.30770052861225705
+          },
+          "recolor": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.34520941039517533,
+            "mean_iou": 0.25891489707507886
+          },
+          "remove": {
+            "count": 80,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3717299899604706,
+            "mean_iou": 0.27498406232203726
+          }
+        },
+        "chart_referring": {
+          "bar/appearance": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.42508170432209935,
+            "mean_iou": 0.3383396344523866
+          },
+          "bar/category": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.32659953251756313,
+            "mean_iou": 0.2477204259640669
+          },
+          "bar/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3982199036458368,
+            "mean_iou": 0.3023948884370299
+          },
+          "bar/trend": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.25868397480303185,
+            "mean_iou": 0.1852900652426007
+          },
+          "confidence_band/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.4935354355512985,
+            "mean_iou": 0.3881440336717872
+          },
+          "confidence_band/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.6343178569239012,
+            "mean_iou": 0.5510952396149726
+          },
+          "confidence_band/legend": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.5137681006924338,
+            "mean_iou": 0.4275871447514244
+          },
+          "confidence_band/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.6389188897798642,
+            "mean_iou": 0.5190297889377451
+          },
+          "line/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.23442003937369632,
+            "mean_iou": 0.15668050138442996
+          },
+          "line/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.23750405316060977,
+            "mean_iou": 0.16068768403647654
+          },
+          "line/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.33282086125379673,
+            "mean_iou": 0.22432773563385205
+          },
+          "line/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.19515426364266025,
+            "mean_iou": 0.13181863430646187
+          },
+          "scatter/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3184169901962856,
+            "mean_iou": 0.2193157600283024
+          },
+          "scatter/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2325983202255583,
+            "mean_iou": 0.14721759246892752
+          },
+          "scatter/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.31044976872612107,
+            "mean_iou": 0.20394178379038763
+          },
+          "scatter/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2510411144535677,
+            "mean_iou": 0.15627377071425572
+          }
+        },
+        "chart_type": {
+          "bar": {
+            "count": 80,
+            "empty_rate": 0.0375,
+            "mean_dice": 0.3521462788221328,
+            "mean_iou": 0.268436253524021
+          },
+          "confidence_band": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.5701350707368745,
+            "mean_iou": 0.47146405174398237
+          },
+          "line": {
+            "count": 80,
+            "empty_rate": 0.0,
+            "mean_dice": 0.24997480435769076,
+            "mean_iou": 0.1683786388403051
+          },
+          "scatter": {
+            "count": 80,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2781265484003832,
+            "mean_iou": 0.18168722675046833
+          }
+        },
+        "degradation_type": {
+          "blur": {
+            "count": 16,
+            "empty_rate": 0.0,
+            "mean_dice": 0.273540511885144,
+            "mean_iou": 0.20086276725838317
+          },
+          "blur+screenshot_scale": {
+            "count": 21,
+            "empty_rate": 0.09523809523809523,
+            "mean_dice": 0.4129383421839718,
+            "mean_iou": 0.29444912296663156
+          },
+          "clean": {
+            "count": 26,
+            "empty_rate": 0.0,
+            "mean_dice": 0.43432685310197,
+            "mean_iou": 0.32968763861455846
+          },
+          "jpeg": {
+            "count": 8,
+            "empty_rate": 0.0,
+            "mean_dice": 0.20901144206052347,
+            "mean_iou": 0.1459418889673819
+          },
+          "jpeg+antialias_x2": {
+            "count": 38,
+            "empty_rate": 0.0,
+            "mean_dice": 0.31956724130873165,
+            "mean_iou": 0.2204327651070768
+          },
+          "jpeg+blur": {
+            "count": 28,
+            "empty_rate": 0.0,
+            "mean_dice": 0.37666093844495135,
+            "mean_iou": 0.30717805909947565
+          },
+          "jpeg+blur+antialias_x2": {
+            "count": 44,
+            "empty_rate": 0.0,
+            "mean_dice": 0.37141745075925137,
+            "mean_iou": 0.27907474442409097
+          },
+          "jpeg+blur+screenshot_scale": {
+            "count": 16,
+            "empty_rate": 0.0,
+            "mean_dice": 0.39185027346607293,
+            "mean_iou": 0.2975779037035484
+          },
+          "jpeg+blur+screenshot_scale+antialias_x2": {
+            "count": 35,
+            "empty_rate": 0.02857142857142857,
+            "mean_dice": 0.35277320837832393,
+            "mean_iou": 0.26845132824515244
+          },
+          "jpeg+screenshot_scale": {
+            "count": 28,
+            "empty_rate": 0.0,
+            "mean_dice": 0.39149784744169913,
+            "mean_iou": 0.30607469394599895
+          },
+          "jpeg+screenshot_scale+antialias_x2": {
+            "count": 41,
+            "empty_rate": 0.024390243902439025,
+            "mean_dice": 0.32004762608051324,
+            "mean_iou": 0.235117367556212
+          },
+          "screenshot_scale": {
+            "count": 19,
+            "empty_rate": 0.0,
+            "mean_dice": 0.43603603927582957,
+            "mean_iou": 0.33878832436353457
+          }
+        },
+        "difficulty": {
+          "easy": {
+            "count": 112,
+            "empty_rate": 0.0,
+            "mean_dice": 0.48460612635958966,
+            "mean_iou": 0.38622127181251786
+          },
+          "hard": {
+            "count": 96,
+            "empty_rate": 0.020833333333333332,
+            "mean_dice": 0.24263356959687568,
+            "mean_iou": 0.1612016845270373
+          },
+          "medium": {
+            "count": 112,
+            "empty_rate": 0.017857142857142856,
+            "mean_dice": 0.343409887069575,
+            "mean_iou": 0.2541531206348621
+          }
+        },
+        "referring_type": {
+          "appearance": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.36786354236084495,
+            "mean_iou": 0.2756199823842266
+          },
+          "category": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.35775494070690816,
+            "mean_iou": 0.2766802355211109
+          },
+          "legend": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.38881465857954717,
+            "mean_iou": 0.2895628881531735
+          },
+          "trend": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.335949560669781,
+            "mean_iou": 0.24810306480026584
+          }
+        },
+        "theme": {
+          "dark": {
+            "count": 160,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.3858045002657186,
+            "mean_iou": 0.2984649778668967
+          },
+          "light": {
+            "count": 160,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.33938685089282206,
+            "mean_iou": 0.24651810756249168
+          }
+        }
+      },
+      "mean_latency_ms": 652.914797118865,
+      "median_latency_ms": 622.9014564305544,
+      "micro_dice": 0.5724017754302291,
+      "micro_iou": 0.4009543900930049,
+      "nonempty_count": 316,
+      "nonempty_disjoint_rate": 0.103125,
+      "overlap_count": 283,
+      "overlap_rate": 0.884375,
+      "sample_count": 320,
+      "sample_macro_dice": 0.36259567557927036,
+      "sample_macro_iou": 0.2724915427146942
+    },
+    "step4800": {
+      "empty_count": 4,
+      "empty_rate": 0.0125,
+      "group_macro_dice": 0.36419266137797596,
+      "group_macro_iou": 0.27339902642381886,
+      "groups": {
+        "action": {
+          "extract": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.33306427689085627,
+            "mean_iou": 0.24589414816461322
+          },
+          "highlight": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.3999841843394651,
+            "mean_iou": 0.30524333848803326
+          },
+          "recolor": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.35119076786997516,
+            "mean_iou": 0.2674199051120075
+          },
+          "remove": {
+            "count": 80,
+            "empty_rate": 0.0,
+            "mean_dice": 0.37253141641160753,
+            "mean_iou": 0.27503871393062135
+          }
+        },
+        "chart_referring": {
+          "bar/appearance": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.44333364982389495,
+            "mean_iou": 0.35174989239144805
+          },
+          "bar/category": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.3312908289751852,
+            "mean_iou": 0.24706368005828608
+          },
+          "bar/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.40930243721936216,
+            "mean_iou": 0.3089611584604969
+          },
+          "bar/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2771160049436229,
+            "mean_iou": 0.1979883060552518
+          },
+          "confidence_band/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.4550245761011613,
+            "mean_iou": 0.3532727405267456
+          },
+          "confidence_band/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.6403459306430825,
+            "mean_iou": 0.5598484401935242
+          },
+          "confidence_band/legend": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.4837724730345082,
+            "mean_iou": 0.4023287673321355
+          },
+          "confidence_band/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.6435499285589863,
+            "mean_iou": 0.5276865701137492
+          },
+          "line/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.22656018443490455,
+            "mean_iou": 0.15093259184647234
+          },
+          "line/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.23881815982044027,
+            "mean_iou": 0.1612396810722331
+          },
+          "line/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.32903580059651005,
+            "mean_iou": 0.2218179214821417
+          },
+          "line/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.19005190063564972,
+            "mean_iou": 0.126764158732323
+          },
+          "scatter/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3318707830744419,
+            "mean_iou": 0.22997318862834754
+          },
+          "scatter/category": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.2261012495234596,
+            "mean_iou": 0.14179584942267348
+          },
+          "scatter/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3370905989394422,
+            "mean_iou": 0.2274899358441705
+          },
+          "scatter/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.263818075722964,
+            "mean_iou": 0.16547154062110256
+          }
+        },
+        "chart_type": {
+          "bar": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.3652607302405163,
+            "mean_iou": 0.27644075924137074
+          },
+          "confidence_band": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.5556732270844347,
+            "mean_iou": 0.4607841295415387
+          },
+          "line": {
+            "count": 80,
+            "empty_rate": 0.0,
+            "mean_dice": 0.24611651137187618,
+            "mean_iou": 0.16518858828329253
+          },
+          "scatter": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.28972017681507695,
+            "mean_iou": 0.1911826286290735
+          }
+        },
+        "degradation_type": {
+          "blur": {
+            "count": 16,
+            "empty_rate": 0.0,
+            "mean_dice": 0.27472704435258843,
+            "mean_iou": 0.19997404992204507
+          },
+          "blur+screenshot_scale": {
+            "count": 21,
+            "empty_rate": 0.047619047619047616,
+            "mean_dice": 0.4100204078196759,
+            "mean_iou": 0.2949069070439626
+          },
+          "clean": {
+            "count": 26,
+            "empty_rate": 0.0,
+            "mean_dice": 0.4230786812754124,
+            "mean_iou": 0.3198961661601316
+          },
+          "jpeg": {
+            "count": 8,
+            "empty_rate": 0.0,
+            "mean_dice": 0.21967774869943513,
+            "mean_iou": 0.15645575368649667
+          },
+          "jpeg+antialias_x2": {
+            "count": 38,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3330779071313976,
+            "mean_iou": 0.22911947150151493
+          },
+          "jpeg+blur": {
+            "count": 28,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3741838979189311,
+            "mean_iou": 0.3061780703203777
+          },
+          "jpeg+blur+antialias_x2": {
+            "count": 44,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3642976821945498,
+            "mean_iou": 0.2693801372466872
+          },
+          "jpeg+blur+screenshot_scale": {
+            "count": 16,
+            "empty_rate": 0.0625,
+            "mean_dice": 0.39701595747849444,
+            "mean_iou": 0.30903207201086824
+          },
+          "jpeg+blur+screenshot_scale+antialias_x2": {
+            "count": 35,
+            "empty_rate": 0.02857142857142857,
+            "mean_dice": 0.3582623136244958,
+            "mean_iou": 0.26950588151800486
+          },
+          "jpeg+screenshot_scale": {
+            "count": 28,
+            "empty_rate": 0.0,
+            "mean_dice": 0.40748798649396123,
+            "mean_iou": 0.32002016592075033
+          },
+          "jpeg+screenshot_scale+antialias_x2": {
+            "count": 41,
+            "empty_rate": 0.024390243902439025,
+            "mean_dice": 0.3158028610277354,
+            "mean_iou": 0.23231794219328533
+          },
+          "screenshot_scale": {
+            "count": 19,
+            "empty_rate": 0.0,
+            "mean_dice": 0.4403104112935161,
+            "mean_iou": 0.34373900281045044
+          }
+        },
+        "difficulty": {
+          "easy": {
+            "count": 112,
+            "empty_rate": 0.008928571428571428,
+            "mean_dice": 0.4855355214210916,
+            "mean_iou": 0.3860841208607776
+          },
+          "hard": {
+            "count": 96,
+            "empty_rate": 0.010416666666666666,
+            "mean_dice": 0.23597118897487354,
+            "mean_iou": 0.15520237605034862
+          },
+          "medium": {
+            "count": 112,
+            "empty_rate": 0.017857142857142856,
+            "mean_dice": 0.3527539205375197,
+            "mean_iou": 0.2620253465926918
+          }
+        },
+        "referring_type": {
+          "appearance": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.3641972983586007,
+            "mean_iou": 0.2714821033482534
+          },
+          "category": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.35913904224054194,
+            "mean_iou": 0.27748691268667924
+          },
+          "legend": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.38980032744745563,
+            "mean_iou": 0.2901494457797361
+          },
+          "trend": {
+            "count": 80,
+            "empty_rate": 0.0,
+            "mean_dice": 0.3436339774653058,
+            "mean_iou": 0.2544776438806067
+          }
+        },
+        "theme": {
+          "dark": {
+            "count": 160,
+            "empty_rate": 0.01875,
+            "mean_dice": 0.38398141403693664,
+            "mean_iou": 0.2964877567254388
+          },
+          "light": {
+            "count": 160,
+            "empty_rate": 0.00625,
+            "mean_dice": 0.3444039087190154,
+            "mean_iou": 0.2503102961221989
+          }
+        }
+      },
+      "mean_latency_ms": 648.7767094513401,
+      "median_latency_ms": 622.4596463143826,
+      "micro_dice": 0.5728058946625475,
+      "micro_iou": 0.4013510793804117,
+      "nonempty_count": 316,
+      "nonempty_disjoint_rate": 0.090625,
+      "overlap_count": 287,
+      "overlap_rate": 0.896875,
+      "sample_count": 320,
+      "sample_macro_dice": 0.364192661377976,
+      "sample_macro_iou": 0.27339902642381886
+    },
+    "step960": {
+      "empty_count": 15,
+      "empty_rate": 0.046875,
+      "group_macro_dice": 0.30099894939217586,
+      "group_macro_iou": 0.21367131340922554,
+      "groups": {
+        "action": {
+          "extract": {
+            "count": 80,
+            "empty_rate": 0.0625,
+            "mean_dice": 0.3009607199001249,
+            "mean_iou": 0.21506379808990284
+          },
+          "highlight": {
+            "count": 80,
+            "empty_rate": 0.05,
+            "mean_dice": 0.3337149170467419,
+            "mean_iou": 0.24211489438704295
+          },
+          "recolor": {
+            "count": 80,
+            "empty_rate": 0.05,
+            "mean_dice": 0.29752120342958227,
+            "mean_iou": 0.20972658538695194
+          },
+          "remove": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.2717989571922545,
+            "mean_iou": 0.1877799757730045
+          }
+        },
+        "chart_referring": {
+          "bar/appearance": {
+            "count": 20,
+            "empty_rate": 0.2,
+            "mean_dice": 0.2981550397435201,
+            "mean_iou": 0.22886260108695758
+          },
+          "bar/category": {
+            "count": 20,
+            "empty_rate": 0.15,
+            "mean_dice": 0.16696790570171385,
+            "mean_iou": 0.11938774201118207
+          },
+          "bar/legend": {
+            "count": 20,
+            "empty_rate": 0.1,
+            "mean_dice": 0.28964062609305946,
+            "mean_iou": 0.20421613282356277
+          },
+          "bar/trend": {
+            "count": 20,
+            "empty_rate": 0.1,
+            "mean_dice": 0.18317232702629288,
+            "mean_iou": 0.13040421378310413
+          },
+          "confidence_band/appearance": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.3859509036770158,
+            "mean_iou": 0.27031973865918785
+          },
+          "confidence_band/category": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.5099623281067414,
+            "mean_iou": 0.3986764603785369
+          },
+          "confidence_band/legend": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.4892829890642557,
+            "mean_iou": 0.40531375768466466
+          },
+          "confidence_band/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.47444688203496793,
+            "mean_iou": 0.3605340846271409
+          },
+          "line/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.1964235355232126,
+            "mean_iou": 0.12151943173921476
+          },
+          "line/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.22247567479691108,
+            "mean_iou": 0.13807039284966088
+          },
+          "line/legend": {
+            "count": 20,
+            "empty_rate": 0.05,
+            "mean_dice": 0.2778777279304171,
+            "mean_iou": 0.17156884676464224
+          },
+          "line/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.21753536056778966,
+            "mean_iou": 0.1328650711840505
+          },
+          "scatter/appearance": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.24596387550887483,
+            "mean_iou": 0.1691438992074649
+          },
+          "scatter/category": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.28534247451279066,
+            "mean_iou": 0.18688389525063762
+          },
+          "scatter/legend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2966906667750995,
+            "mean_iou": 0.2018667324959554
+          },
+          "scatter/trend": {
+            "count": 20,
+            "empty_rate": 0.0,
+            "mean_dice": 0.27609487321215176,
+            "mean_iou": 0.1791080140016456
+          }
+        },
+        "chart_type": {
+          "bar": {
+            "count": 80,
+            "empty_rate": 0.1375,
+            "mean_dice": 0.23448397464114654,
+            "mean_iou": 0.17071767242620162
+          },
+          "confidence_band": {
+            "count": 80,
+            "empty_rate": 0.0375,
+            "mean_dice": 0.46491077572074513,
+            "mean_iou": 0.35871101033738256
+          },
+          "line": {
+            "count": 80,
+            "empty_rate": 0.0125,
+            "mean_dice": 0.2285780747045826,
+            "mean_iou": 0.14100593563439207
+          },
+          "scatter": {
+            "count": 80,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2760229725022291,
+            "mean_iou": 0.18425063523892588
+          }
+        },
+        "degradation_type": {
+          "blur": {
+            "count": 16,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2302440481042606,
+            "mean_iou": 0.15364752938547302
+          },
+          "blur+screenshot_scale": {
+            "count": 21,
+            "empty_rate": 0.09523809523809523,
+            "mean_dice": 0.2859634252094773,
+            "mean_iou": 0.20254538093727048
+          },
+          "clean": {
+            "count": 26,
+            "empty_rate": 0.038461538461538464,
+            "mean_dice": 0.3346780677915549,
+            "mean_iou": 0.23967327590335355
+          },
+          "jpeg": {
+            "count": 8,
+            "empty_rate": 0.375,
+            "mean_dice": 0.11119218538117039,
+            "mean_iou": 0.07016783651923231
+          },
+          "jpeg+antialias_x2": {
+            "count": 38,
+            "empty_rate": 0.0,
+            "mean_dice": 0.28763047432341976,
+            "mean_iou": 0.1932290422194959
+          },
+          "jpeg+blur": {
+            "count": 28,
+            "empty_rate": 0.03571428571428571,
+            "mean_dice": 0.25642291526387223,
+            "mean_iou": 0.18308265349104794
+          },
+          "jpeg+blur+antialias_x2": {
+            "count": 44,
+            "empty_rate": 0.022727272727272728,
+            "mean_dice": 0.345616137024648,
+            "mean_iou": 0.24229826255845877
+          },
+          "jpeg+blur+screenshot_scale": {
+            "count": 16,
+            "empty_rate": 0.0,
+            "mean_dice": 0.2947118162890877,
+            "mean_iou": 0.21605013847683066
+          },
+          "jpeg+blur+screenshot_scale+antialias_x2": {
+            "count": 35,
+            "empty_rate": 0.05714285714285714,
+            "mean_dice": 0.36383795887931214,
+            "mean_iou": 0.27778865964836985
+          },
+          "jpeg+screenshot_scale": {
+            "count": 28,
+            "empty_rate": 0.07142857142857142,
+            "mean_dice": 0.3053930967362723,
+            "mean_iou": 0.21770177074456237
+          },
+          "jpeg+screenshot_scale+antialias_x2": {
+            "count": 41,
+            "empty_rate": 0.024390243902439025,
+            "mean_dice": 0.2836295995973278,
+            "mean_iou": 0.195813689645439
+          },
+          "screenshot_scale": {
+            "count": 19,
+            "empty_rate": 0.10526315789473684,
+            "mean_dice": 0.3206795929752118,
+            "mean_iou": 0.2335053337455537
+          }
+        },
+        "difficulty": {
+          "easy": {
+            "count": 112,
+            "empty_rate": 0.026785714285714284,
+            "mean_dice": 0.3625149428194781,
+            "mean_iou": 0.27110387457704854
+          },
+          "hard": {
+            "count": 96,
+            "empty_rate": 0.09375,
+            "mean_dice": 0.22587108937675882,
+            "mean_iou": 0.14852337142389233
+          },
+          "medium": {
+            "count": 112,
+            "empty_rate": 0.026785714285714284,
+            "mean_dice": 0.3038782645495168,
+            "mean_iou": 0.21207984537168817
+          }
+        },
+        "referring_type": {
+          "appearance": {
+            "count": 80,
+            "empty_rate": 0.0625,
+            "mean_dice": 0.2816233386131558,
+            "mean_iou": 0.19746141767320624
+          },
+          "category": {
+            "count": 80,
+            "empty_rate": 0.05,
+            "mean_dice": 0.29618709577953917,
+            "mean_iou": 0.21075462262250438
+          },
+          "legend": {
+            "count": 80,
+            "empty_rate": 0.05,
+            "mean_dice": 0.33837300246570795,
+            "mean_iou": 0.24574136744220626
+          },
+          "trend": {
+            "count": 80,
+            "empty_rate": 0.025,
+            "mean_dice": 0.2878123607103006,
+            "mean_iou": 0.20072784589898526
+          }
+        },
+        "theme": {
+          "dark": {
+            "count": 160,
+            "empty_rate": 0.0375,
+            "mean_dice": 0.3080676619301806,
+            "mean_iou": 0.2234320571790592
+          },
+          "light": {
+            "count": 160,
+            "empty_rate": 0.05625,
+            "mean_dice": 0.29393023685417113,
+            "mean_iou": 0.20391056963939186
+          }
+        }
+      },
+      "mean_latency_ms": 651.5721310512163,
+      "median_latency_ms": 620.9233347326517,
+      "micro_dice": 0.47374355887355596,
+      "micro_iou": 0.31039578022937775,
+      "nonempty_count": 305,
+      "nonempty_disjoint_rate": 0.059375,
+      "overlap_count": 286,
+      "overlap_rate": 0.89375,
+      "sample_count": 320,
+      "sample_macro_dice": 0.30099894939217586,
+      "sample_macro_iou": 0.21367131340922554
+    }
+  },
+  "failure_type_counts": {
+    "strategy_a": {
+      "boundary error": 36,
+      "over-segmentation": 77,
+      "partial target": 53,
+      "under-segmentation": 123,
+      "wrong series": 31
+    },
+    "strategy_b": {
+      "boundary error": 44,
+      "over-segmentation": 81,
+      "partial target": 54,
+      "under-segmentation": 112,
+      "wrong series": 29
+    }
+  },
+  "manifest_sha256": "1815d127d9104db1e1d91d2dddd8080c099a4f84d922896f655910adca2154be",
+  "model_load_attempts": 1,
+  "paired_group_bootstrap": {
+    "dice": {
+      "ci95": [
+        0.03615376536890373,
+        0.11492287151865223
+      ],
+      "difference": 0.07207345700493827
+    },
+    "iou": {
+      "ci95": [
+        0.0319900732060343,
+        0.10114108577104586
+      ],
+      "difference": 0.06303357250272669
+    },
+    "iterations": 10000,
+    "seed": 20260916
+  },
+  "peak_gpu_memory_mb": 5195.3955078125,
+  "sample_count": 320,
+  "smoke": {
+    "alignment": {
+      "gt_mask_count": 1,
+      "object_count_policy": "strict_one_to_one",
+      "sample_id": "cgev2_line_category_1609c9161fd4",
+      "supervised_seg_count": 1,
+      "token_positions": [
+        816
+      ]
+    },
+    "checkpoint": {
+      "bytes": 16032482,
+      "path": "<PHASE7B_WORK_DIR>/smoke/iter_1.pth",
+      "sha256": "012ea1545f9ac3c96439c61fe5f5c35f819eaedb346038609951a30d8f739a3c",
+      "tensor_count": 68
+    },
+    "lora_changed_elements": 458722,
+    "model_build_seconds": 27.71317146345973,
+    "oom": false,
+    "peak_allocated_mib": 10169.802734375,
+    "peak_reserved_mib": 10890.0,
+    "projection_changed_elements": 1036610,
+    "reload_exact": true,
+    "sample_id": "cgev2_line_category_1609c9161fd4",
+    "step": {
+      "backward_seconds": 0.2741951420903206,
+      "dice_loss": 0.48804253339767456,
+      "forward_seconds": 0.7942385226488113,
+      "frozen_parameter_gradient_count": 0,
+      "language_loss": 0.2583266794681549,
+      "learning_rates": {
+        "lora": 4.1666666666666667e-07,
+        "projection": 1.6666666666666668e-07
+      },
+      "lora_gradient_norm": 1.1559434407907987,
+      "lora_nonzero_gradient_tensors": 32,
+      "mask_ce_loss": 0.09738782048225403,
+      "optimizer_seconds": 0.038137029856443405,
+      "projection_gradient_norm": 11.268785381072036,
+      "projection_nonzero_gradient_tensors": 4,
+      "total_loss": 0.8437570333480835
+    },
+    "trainable_contract": {
+      "lora_count": 1245184,
+      "lora_names": [
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.v_proj.lora_B.default.weight"
+      ],
+      "model_total_count": 2317402418,
+      "names": [
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.v_proj.lora_B.default.weight",
+        "text_hidden_fcs.0.bias",
+        "text_hidden_fcs.0.weight",
+        "text_hidden_fcs.2.bias",
+        "text_hidden_fcs.2.weight"
+      ],
+      "projection_count": 2754304,
+      "projection_names": [
+        "text_hidden_fcs.0.bias",
+        "text_hidden_fcs.0.weight",
+        "text_hidden_fcs.2.bias",
+        "text_hidden_fcs.2.weight"
+      ],
+      "total_count": 3999488
+    }
+  },
+  "split": "val",
+  "strategy_a": {
+    "delta_vs_v1_step960": {
+      "empty_rate": 0.0375,
+      "group_macro_dice": 0.02727077770192199,
+      "group_macro_iou": 0.031550209864510154,
+      "micro_dice": 0.07424472307392277,
+      "micro_iou": 0.059545060762349056,
+      "sample_macro_dice": 0.027270777701922044,
+      "sample_macro_iou": 0.031550209864510154
+    },
+    "delta_vs_zero_shot": {
+      "empty_rate": -0.32499999999999996,
+      "group_macro_dice": 0.147013822416564,
+      "group_macro_iou": 0.11278998747742353,
+      "micro_dice": 0.1751087493504826,
+      "micro_iou": 0.1321918634296402,
+      "sample_macro_dice": 0.14701382241656402,
+      "sample_macro_iou": 0.11278998747742355
+    },
+    "edit_skipped_empty_count": 13,
+    "edit_success_count": 307,
+    "empty_count": 13,
+    "empty_rate": 0.040625,
+    "group_macro_dice": 0.29211920437303773,
+    "group_macro_iou": 0.21036545392109215,
+    "groups": {
+      "action": {
+        "extract": {
+          "count": 80,
+          "empty_rate": 0.0375,
+          "mean_dice": 0.2787282334253419,
+          "mean_iou": 0.20124431776368484,
+          "nonempty_disjoint_rate": 0.1,
+          "overlap_rate": 0.8625
+        },
+        "highlight": {
+          "count": 80,
+          "empty_rate": 0.0375,
+          "mean_dice": 0.3086214908268631,
+          "mean_iou": 0.22355950940898756,
+          "nonempty_disjoint_rate": 0.05,
+          "overlap_rate": 0.9125
+        },
+        "recolor": {
+          "count": 80,
+          "empty_rate": 0.075,
+          "mean_dice": 0.29485181043375613,
+          "mean_iou": 0.21118239717061407,
+          "nonempty_disjoint_rate": 0.0875,
+          "overlap_rate": 0.8375
+        },
+        "remove": {
+          "count": 80,
+          "empty_rate": 0.0125,
+          "mean_dice": 0.28627528280618975,
+          "mean_iou": 0.20547559134108223,
+          "nonempty_disjoint_rate": 0.15,
+          "overlap_rate": 0.8375
+        }
+      },
+      "chart_referring": {
+        "bar/appearance": {
+          "count": 20,
+          "empty_rate": 0.0,
+          "mean_dice": 0.40270053463266403,
+          "mean_iou": 0.30515961272751135
+        },
+        "bar/category": {
+          "count": 20,
+          "empty_rate": 0.15,
+          "mean_dice": 0.19408494604510051,
+          "mean_iou": 0.1457923295123375
+        },
+        "bar/legend": {
+          "count": 20,
+          "empty_rate": 0.0,
+          "mean_dice": 0.36344200996511855,
+          "mean_iou": 0.26060881787742707
+        },
+        "bar/trend": {
+          "count": 20,
+          "empty_rate": 0.05,
+          "mean_dice": 0.26671576124444696,
+          "mean_iou": 0.18714783078299263
+        },
+        "confidence_band/appearance": {
+          "count": 20,
+          "empty_rate": 0.05,
+          "mean_dice": 0.44131536360777357,
+          "mean_iou": 0.3412390295773566
+        },
+        "confidence_band/category": {
+          "count": 20,
+          "empty_rate": 0.15,
+          "mean_dice": 0.4456002584504608,
+          "mean_iou": 0.3731125204635731
+        },
+        "confidence_band/legend": {
+          "count": 20,
+          "empty_rate": 0.15,
+          "mean_dice": 0.32762050184926683,
+          "mean_iou": 0.28356965051921706
+        },
+        "confidence_band/trend": {
+          "count": 20,
+          "empty_rate": 0.05,
+          "mean_dice": 0.3639984095156469,
+          "mean_iou": 0.2686788832089052
+        },
+        "line/appearance": {
+          "count": 20,
+          "empty_rate": 0.0,
+          "mean_dice": 0.2243693638690914,
+          "mean_iou": 0.14897682768847875
+        },
+        "line/category": {
+          "count": 20,
+          "empty_rate": 0.05,
+          "mean_dice": 0.2537055909801092,
+          "mean_iou": 0.16888259514804022
+        },
+        "line/legend": {
+          "count": 20,
+          "empty_rate": 0.0,
+          "mean_dice": 0.31715501048031364,
+          "mean_iou": 0.2106344070544041
+        },
+        "line/trend": {
+          "count": 20,
+          "empty_rate": 0.0,
+          "mean_dice": 0.1777525469552066,
+          "mean_iou": 0.11401673870409743
+        },
+        "scatter/appearance": {
+          "count": 20,
+          "empty_rate": 0.0,
+          "mean_dice": 0.23906111612388323,
+          "mean_iou": 0.15023645997796128
+        },
+        "scatter/category": {
+          "count": 20,
+          "empty_rate": 0.0,
+          "mean_dice": 0.22356962458417456,
+          "mean_iou": 0.1346338444649172
+        },
+        "scatter/legend": {
+          "count": 20,
+          "empty_rate": 0.0,
+          "mean_dice": 0.23941628340034224,
+          "mean_iou": 0.15425761706362343
+        },
+        "scatter/trend": {
+          "count": 20,
+          "empty_rate": 0.0,
+          "mean_dice": 0.19339994826500495,
+          "mean_iou": 0.1189000979666317
+        }
+      },
+      "chart_type": {
+        "bar": {
+          "count": 80,
+          "empty_rate": 0.05,
+          "mean_dice": 0.3067358129718325,
+          "mean_iou": 0.22467714772506717,
+          "nonempty_disjoint_rate": 0.0875,
+          "overlap_rate": 0.8625
+        },
+        "confidence_band": {
+          "count": 80,
+          "empty_rate": 0.1,
+          "mean_dice": 0.39463363335578705,
+          "mean_iou": 0.316650020942263,
+          "nonempty_disjoint_rate": 0.0875,
+          "overlap_rate": 0.8125
+        },
+        "line": {
+          "count": 80,
+          "empty_rate": 0.0125,
+          "mean_dice": 0.24324562807118016,
+          "mean_iou": 0.16062764214875513,
+          "nonempty_disjoint_rate": 0.1625,
+          "overlap_rate": 0.825
+        },
+        "scatter": {
+          "count": 80,
+          "empty_rate": 0.0,
+          "mean_dice": 0.22386174309335125,
+          "mean_iou": 0.13950700486828344,
+          "nonempty_disjoint_rate": 0.05,
+          "overlap_rate": 0.95
+        }
+      },
+      "degradation_type": {
+        "blur": {
+          "count": 16,
+          "empty_rate": 0.0,
+          "mean_dice": 0.2615730825214891,
+          "mean_iou": 0.18739475043267817,
+          "nonempty_disjoint_rate": 0.125,
+          "overlap_rate": 0.875
+        },
+        "blur+screenshot_scale": {
+          "count": 21,
+          "empty_rate": 0.09523809523809523,
+          "mean_dice": 0.3223279915876848,
+          "mean_iou": 0.2282686747888668,
+          "nonempty_disjoint_rate": 0.047619047619047616,
+          "overlap_rate": 0.8571428571428571
+        },
+        "clean": {
+          "count": 26,
+          "empty_rate": 0.0,
+          "mean_dice": 0.295464255679338,
+          "mean_iou": 0.20068842664317926,
+          "nonempty_disjoint_rate": 0.11538461538461539,
+          "overlap_rate": 0.8846153846153846
+        },
+        "jpeg": {
+          "count": 8,
+          "empty_rate": 0.0,
+          "mean_dice": 0.22975084792344977,
+          "mean_iou": 0.14933543102348212,
+          "nonempty_disjoint_rate": 0.125,
+          "overlap_rate": 0.875
+        },
+        "jpeg+antialias_x2": {
+          "count": 38,
+          "empty_rate": 0.0,
+          "mean_dice": 0.2921851909542536,
+          "mean_iou": 0.19579732040471676,
+          "nonempty_disjoint_rate": 0.07894736842105263,
+          "overlap_rate": 0.9210526315789473
+        },
+        "jpeg+blur": {
+          "count": 28,
+          "empty_rate": 0.03571428571428571,
+          "mean_dice": 0.31543248480165426,
+          "mean_iou": 0.2545426019832298,
+          "nonempty_disjoint_rate": 0.10714285714285714,
+          "overlap_rate": 0.8571428571428571
+        },
+        "jpeg+blur+antialias_x2": {
+          "count": 44,
+          "empty_rate": 0.022727272727272728,
+          "mean_dice": 0.28086475193922805,
+          "mean_iou": 0.2006009663805276,
+          "nonempty_disjoint_rate": 0.09090909090909091,
+          "overlap_rate": 0.8863636363636364
+        },
+        "jpeg+blur+screenshot_scale": {
+          "count": 16,
+          "empty_rate": 0.0,
+          "mean_dice": 0.3574920762713724,
+          "mean_iou": 0.2636335700906267,
+          "nonempty_disjoint_rate": 0.1875,
+          "overlap_rate": 0.8125
+        },
+        "jpeg+blur+screenshot_scale+antialias_x2": {
+          "count": 35,
+          "empty_rate": 0.02857142857142857,
+          "mean_dice": 0.3291995326560266,
+          "mean_iou": 0.2381966360384058,
+          "nonempty_disjoint_rate": 0.08571428571428572,
+          "overlap_rate": 0.8857142857142857
+        },
+        "jpeg+screenshot_scale": {
+          "count": 28,
+          "empty_rate": 0.14285714285714285,
+          "mean_dice": 0.2112024049343852,
+          "mean_iou": 0.16111241168558496,
+          "nonempty_disjoint_rate": 0.17857142857142858,
+          "overlap_rate": 0.6785714285714286
+        },
+        "jpeg+screenshot_scale+antialias_x2": {
+          "count": 41,
+          "empty_rate": 0.04878048780487805,
+          "mean_dice": 0.2725103496083204,
+          "mean_iou": 0.19554900159493674,
+          "nonempty_disjoint_rate": 0.04878048780487805,
+          "overlap_rate": 0.9024390243902439
+        },
+        "screenshot_scale": {
+          "count": 19,
+          "empty_rate": 0.10526315789473684,
+          "mean_dice": 0.33591401964187817,
+          "mean_iou": 0.24393657943758015,
+          "nonempty_disjoint_rate": 0.05263157894736842,
+          "overlap_rate": 0.8421052631578947
+        }
+      },
+      "difficulty": {
+        "easy": {
+          "count": 112,
+          "empty_rate": 0.026785714285714284,
+          "mean_dice": 0.3779265418476559,
+          "mean_iou": 0.2882745348085741,
+          "nonempty_disjoint_rate": 0.09821428571428571,
+          "overlap_rate": 0.875
+        },
+        "hard": {
+          "count": 96,
+          "empty_rate": 0.041666666666666664,
+          "mean_dice": 0.18776934413824764,
+          "mean_iou": 0.11959445514394973,
+          "nonempty_disjoint_rate": 0.08333333333333333,
+          "overlap_rate": 0.875
+        },
+        "medium": {
+          "count": 112,
+          "empty_rate": 0.05357142857142857,
+          "mean_dice": 0.2957546042425255,
+          "mean_iou": 0.21026008627116097,
+          "nonempty_disjoint_rate": 0.10714285714285714,
+          "overlap_rate": 0.8392857142857143
+        }
+      },
+      "referring_type": {
+        "appearance": {
+          "count": 80,
+          "empty_rate": 0.0125,
+          "mean_dice": 0.326861594558353,
+          "mean_iou": 0.236402982492827,
+          "nonempty_disjoint_rate": 0.1,
+          "overlap_rate": 0.8875
+        },
+        "category": {
+          "count": 80,
+          "empty_rate": 0.0875,
+          "mean_dice": 0.27924010501496127,
+          "mean_iou": 0.20560532239721704,
+          "nonempty_disjoint_rate": 0.125,
+          "overlap_rate": 0.7875
+        },
+        "legend": {
+          "count": 80,
+          "empty_rate": 0.0375,
+          "mean_dice": 0.31190845142376034,
+          "mean_iou": 0.22726762312866794,
+          "nonempty_disjoint_rate": 0.075,
+          "overlap_rate": 0.8875
+        },
+        "trend": {
+          "count": 80,
+          "empty_rate": 0.025,
+          "mean_dice": 0.2504666664950763,
+          "mean_iou": 0.17218588766565673,
+          "nonempty_disjoint_rate": 0.0875,
+          "overlap_rate": 0.8875
+        }
+      },
+      "theme": {
+        "dark": {
+          "count": 160,
+          "empty_rate": 0.04375,
+          "mean_dice": 0.3123366744988199,
+          "mean_iou": 0.2297512393251077,
+          "nonempty_disjoint_rate": 0.08125,
+          "overlap_rate": 0.875
+        },
+        "light": {
+          "count": 160,
+          "empty_rate": 0.0375,
+          "mean_dice": 0.27190173424725556,
+          "mean_iou": 0.19097966851707665,
+          "nonempty_disjoint_rate": 0.1125,
+          "overlap_rate": 0.85
+        }
+      }
+    },
+    "micro_dice": 0.4575304994847277,
+    "micro_iou": 0.2966220721588897,
+    "nonempty_count": 307,
+    "nonempty_disjoint_rate": 0.096875,
+    "overlap_count": 276,
+    "overlap_rate": 0.8625,
+    "sample_count": 320,
+    "sample_macro_dice": 0.29211920437303773,
+    "sample_macro_iou": 0.21036545392109218
+  },
+  "training": {
+    "checkpoint_artifacts": {
+      "1920": {
+        "bytes": 16032698,
+        "sha256": "739b81af1a1fbb2699bfca30539042b639765a65b717c6f5159f9cf336886ce7"
+      },
+      "2880": {
+        "bytes": 16032698,
+        "sha256": "cdf71464eb12b835f8ca9ffcb0dafd372bb43f8c6934fb07a421326dec055e20"
+      },
+      "3840": {
+        "bytes": 16032698,
+        "sha256": "e7a9cfc2087ba98b8b9c5a0d11648629092eb2e8ed03f0718c27e731e87688e4"
+      },
+      "4800": {
+        "bytes": 16032698,
+        "sha256": "c47ce4e38a9b1679c766d6360d66b6a3b69286d36b9d7cde50c70991ae475b97"
+      },
+      "960": {
+        "bytes": 16032626,
+        "sha256": "d169b37463828869b7e7533a83ae19a4b6e8893fea947a4aa1a70f62e5e12113"
+      }
+    },
+    "completed_steps": 4800,
+    "epoch_summaries": [
+      {
+        "dice_loss_mean": 0.3748366675533665,
+        "epoch": 1,
+        "language_loss_mean": 0.02062692562438618,
+        "lora_gradient_norm_mean": 1.3666722166383372,
+        "mask_ce_loss_mean": 0.4925066890583063,
+        "peak_allocated_mib": 14407.78759765625,
+        "peak_reserved_mib": 20698.0,
+        "projection_gradient_norm_mean": 8.5751077290431,
+        "step_end": 960,
+        "step_seconds_mean": 0.8022854026057757,
+        "step_start": 1,
+        "total_loss_mean": 0.8879702824167908
+      },
+      {
+        "dice_loss_mean": 0.33981933205989967,
+        "epoch": 2,
+        "language_loss_mean": 0.0002842516954463766,
+        "lora_gradient_norm_mean": 1.7732856505631596,
+        "mask_ce_loss_mean": 0.4206775649450719,
+        "peak_allocated_mib": 14407.78759765625,
+        "peak_reserved_mib": 20698.0,
+        "projection_gradient_norm_mean": 6.902080142228317,
+        "step_end": 1920,
+        "step_seconds_mean": 0.7976535798011658,
+        "step_start": 961,
+        "total_loss_mean": 0.7607811478160632
+      },
+      {
+        "dice_loss_mean": 0.3140646040720943,
+        "epoch": 3,
+        "language_loss_mean": 0.0002533293847951275,
+        "lora_gradient_norm_mean": 2.3191296167379716,
+        "mask_ce_loss_mean": 0.3915229497341594,
+        "peak_allocated_mib": 14407.78759765625,
+        "peak_reserved_mib": 20698.0,
+        "projection_gradient_norm_mean": 7.380034795849777,
+        "step_end": 2880,
+        "step_seconds_mean": 0.7928180925082415,
+        "step_start": 1921,
+        "total_loss_mean": 0.70584088251926
+      },
+      {
+        "dice_loss_mean": 0.2917148303987536,
+        "epoch": 4,
+        "language_loss_mean": 0.000194230613708631,
+        "lora_gradient_norm_mean": 2.2860999069667267,
+        "mask_ce_loss_mean": 0.35105876660866975,
+        "peak_allocated_mib": 14407.78759765625,
+        "peak_reserved_mib": 20698.0,
+        "projection_gradient_norm_mean": 7.087401904212316,
+        "step_end": 3840,
+        "step_seconds_mean": 0.7932127809501253,
+        "step_start": 2881,
+        "total_loss_mean": 0.6429678257127913
+      },
+      {
+        "dice_loss_mean": 0.2816302765975706,
+        "epoch": 5,
+        "language_loss_mean": 0.00014600213636128956,
+        "lora_gradient_norm_mean": 2.4939004099371886,
+        "mask_ce_loss_mean": 0.33589014284079893,
+        "peak_allocated_mib": 14407.78759765625,
+        "peak_reserved_mib": 20698.0,
+        "projection_gradient_norm_mean": 7.082073009016593,
+        "step_end": 4800,
+        "step_seconds_mean": 0.7947993399536547,
+        "step_start": 3841,
+        "total_loss_mean": 0.6176664212718606
+      }
+    ],
+    "model_build_seconds": 26.43708562478423,
+    "oom": false,
+    "peak_allocated_mib": 14407.78759765625,
+    "peak_reserved_mib": 20698.0,
+    "retry_count": 0,
+    "trainable_contract": {
+      "lora_count": 1245184,
+      "lora_names": [
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.v_proj.lora_B.default.weight"
+      ],
+      "model_total_count": 2317402418,
+      "names": [
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.20.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.21.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.22.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.23.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.24.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.25.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.26.self_attn.v_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.k_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.k_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.o_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.o_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.q_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.q_proj.lora_B.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.v_proj.lora_A.default.weight",
+        "mllm.model.language_model.base_model.model.model.layers.27.self_attn.v_proj.lora_B.default.weight",
+        "text_hidden_fcs.0.bias",
+        "text_hidden_fcs.0.weight",
+        "text_hidden_fcs.2.bias",
+        "text_hidden_fcs.2.weight"
+      ],
+      "projection_count": 2754304,
+      "projection_names": [
+        "text_hidden_fcs.0.bias",
+        "text_hidden_fcs.0.weight",
+        "text_hidden_fcs.2.bias",
+        "text_hidden_fcs.2.weight"
+      ],
+      "total_count": 3999488
+    },
+    "training_seconds": 3824.63689930737,
+    "visits_per_sample": [
+      5
+    ]
+  }
+}

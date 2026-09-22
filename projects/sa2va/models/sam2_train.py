@@ -18,7 +18,7 @@ class SAM2TrainRunner(BaseModule):
     def __init__(
             self,
             cfg_path: str = "sam2_hiera_l.yaml",
-            ckpt_path: str = "sam2_hiera_large.pt",
+            ckpt_path: str | None = "sam2_hiera_large.pt",
             hydra_overrides_extra=None,
             apply_postprocessing=True,
     ):
@@ -51,8 +51,11 @@ class SAM2TrainRunner(BaseModule):
         cfg = compose(config_name=cfg_path, overrides=hydra_overrides)
         OmegaConf.resolve(cfg)
         sam2_model = instantiate(cfg.model, _recursive_=True)
-        state_dict = load_checkpoint_with_prefix(os.path.join(BASE_DIR, ckpt_path))
-        load_state_dict_to_model(sam2_model, state_dict)
+        if ckpt_path is not None:
+            state_dict = load_checkpoint_with_prefix(
+                os.path.join(BASE_DIR, ckpt_path)
+            )
+            load_state_dict_to_model(sam2_model, state_dict)
 
         self.sam2_model = sam2_model
 
